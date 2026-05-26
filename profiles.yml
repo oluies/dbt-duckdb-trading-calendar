@@ -4,7 +4,14 @@ holiday_loader:
     dev:
       type: duckdb
       path: 'holiday_loader.duckdb'
-      threads: 4
+      # Single-threaded. The DuckDB community `mssql` extension is not
+      # safe under concurrent reads against an attached SQL Server --
+      # `dbt test` with threads >= 2 segfaults the worker process
+      # mid-suite (exit 139, leaked semaphores). One thread takes a
+      # little longer but completes deterministically. Override locally
+      # at your own risk via DBT_THREADS=N if/when the extension
+      # stabilises.
+      threads: 1
       extensions:
         - httpfs
         - azure
