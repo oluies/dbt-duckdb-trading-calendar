@@ -9,11 +9,13 @@ holiday_loader:
         - httpfs
         - azure
         # mssql is NOT in the core DuckDB extension repo; it lives in the
-        # community repo. Without `repository: community` the extension
-        # loader hits extensions.duckdb.org/.../mssql.duckdb_extension.gz
-        # and returns HTTP 404.
+        # community repo. dbt-duckdb's Extension dataclass takes `name`
+        # and `repo` (NOT `repository` -- the wrong key triggers
+        # "Failed to parse extension: Extension.__init__() got an
+        # unexpected keyword argument 'repository'") and emits
+        # `INSTALL mssql FROM community`.
         - name: mssql
-          repository: community
+          repo: community
       secrets:
         - type: azure
           provider: config
