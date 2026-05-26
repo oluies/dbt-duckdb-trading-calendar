@@ -103,6 +103,20 @@ models:
           - relationships:
               to: ref('dim_country')
               field: country_code
+      - name: is_trading_day
+        description: True if the exchange is open (possibly half-day). False = full closure.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+              quote: false
+      - name: is_settlement_day
+        description: True if trades settle on this date.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [true, false]
+              quote: false
 
 seeds:
 

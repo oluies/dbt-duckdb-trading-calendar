@@ -10,10 +10,12 @@ with source as (
     from read_parquet(
         'azure://holidaydatacontainer/Processed/*.parquet'
     )
+    -- Filter against the dim_country seed rather than re-interpolating
+    -- var('holiday_country_codes'). Single source of truth: the seed
+    -- file is the list of countries we load, and the schema test on
+    -- dim_country.country_code keeps it in sync with the var.
     where countryRegionCode in (
-        {%- for code in var('holiday_country_codes') -%}
-            '{{ code }}'{% if not loop.last %}, {% endif %}
-        {%- endfor -%}
+        select country_code from {{ ref('dim_country') }}
     )
       -- Clip to the same horizon as the date spine. The upstream
       -- parquet is a 1970-2099 snapshot; rows outside the spine have
