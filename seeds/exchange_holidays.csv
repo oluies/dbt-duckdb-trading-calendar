@@ -1,0 +1,46 @@
+calendar_date,exchange_code,exchange_name,country_code,is_trading_day,is_settlement_day,holiday_name
+2024-01-01,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Day
+2024-01-05,XSTO,Nasdaq Stockholm,SE,true,true,Epiphany Eve (half-day)
+2024-03-28,XSTO,Nasdaq Stockholm,SE,true,true,Maundy Thursday (half-day)
+2024-03-29,XSTO,Nasdaq Stockholm,SE,false,false,Good Friday
+2024-04-01,XSTO,Nasdaq Stockholm,SE,false,false,Easter Monday
+2024-04-30,XSTO,Nasdaq Stockholm,SE,true,true,Walpurgis Eve (half-day)
+2024-05-01,XSTO,Nasdaq Stockholm,SE,false,false,Labour Day
+2024-05-08,XSTO,Nasdaq Stockholm,SE,true,true,Ascension Eve (half-day)
+2024-05-09,XSTO,Nasdaq Stockholm,SE,false,false,Ascension Day
+2024-06-06,XSTO,Nasdaq Stockholm,SE,false,false,National Day of Sweden
+2024-06-21,XSTO,Nasdaq Stockholm,SE,false,false,Midsummer Eve
+2024-12-23,XSTO,Nasdaq Stockholm,SE,true,true,Christmas Eve Eve (half-day)
+2024-12-24,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Eve
+2024-12-25,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Day
+2024-12-26,XSTO,Nasdaq Stockholm,SE,false,false,Boxing Day
+2024-12-31,XSTO,Nasdaq Stockholm,SE,true,true,New Year's Eve (half-day)
+2025-01-01,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Day
+2025-01-06,XSTO,Nasdaq Stockholm,SE,false,false,Epiphany
+2025-04-17,XSTO,Nasdaq Stockholm,SE,true,true,Maundy Thursday (half-day)
+2025-04-18,XSTO,Nasdaq Stockholm,SE,false,false,Good Friday
+2025-04-21,XSTO,Nasdaq Stockholm,SE,false,false,Easter Monday
+2025-04-30,XSTO,Nasdaq Stockholm,SE,true,true,Walpurgis Eve (half-day)
+2025-05-01,XSTO,Nasdaq Stockholm,SE,false,false,Labour Day
+2025-05-28,XSTO,Nasdaq Stockholm,SE,true,true,Ascension Eve (half-day)
+2025-05-29,XSTO,Nasdaq Stockholm,SE,false,false,Ascension Day
+2025-06-06,XSTO,Nasdaq Stockholm,SE,false,false,National Day of Sweden
+2025-06-20,XSTO,Nasdaq Stockholm,SE,false,false,Midsummer Eve
+2025-12-24,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Eve
+2025-12-25,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Day
+2025-12-26,XSTO,Nasdaq Stockholm,SE,false,false,Boxing Day
+2025-12-31,XSTO,Nasdaq Stockholm,SE,true,true,New Year's Eve (half-day)
+2026-01-01,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Day
+2026-01-06,XSTO,Nasdaq Stockholm,SE,false,false,Epiphany
+2026-04-02,XSTO,Nasdaq Stockholm,SE,true,true,Maundy Thursday (half-day)
+2026-04-03,XSTO,Nasdaq Stockholm,SE,false,false,Good Friday
+2026-04-06,XSTO,Nasdaq Stockholm,SE,false,false,Easter Monday
+2026-04-30,XSTO,Nasdaq Stockholm,SE,true,true,Walpurgis Eve (half-day)
+2026-05-01,XSTO,Nasdaq Stockholm,SE,false,false,Labour Day
+2026-05-13,XSTO,Nasdaq Stockholm,SE,true,true,Ascension Eve (half-day)
+2026-05-14,XSTO,Nasdaq Stockholm,SE,false,false,Ascension Day
+2026-06-05,XSTO,Nasdaq Stockholm,SE,true,true,National Day Eve (half-day)
+2026-06-19,XSTO,Nasdaq Stockholm,SE,false,false,Midsummer Eve
+2026-12-24,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Eve
+2026-12-25,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Day
+2026-12-31,XSTO,Nasdaq Stockholm,SE,true,true,New Year's Eve (half-day)

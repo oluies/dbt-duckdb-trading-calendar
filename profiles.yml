@@ -1,0 +1,38 @@
+holiday_loader:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'holiday_loader.duckdb'
+      # Single-threaded. The DuckDB community `mssql` extension is not
+      # safe under concurrent reads against an attached SQL Server --
+      # `dbt test` with threads >= 2 segfaults the worker process
+      # mid-suite (exit 139, leaked semaphores). One thread takes a
+      # little longer but completes deterministically. Override locally
+      # at your own risk via DBT_THREADS=N if/when the extension
+      # stabilises.
+      threads: 1
+      extensions:
+        - httpfs
+        - azure
+        # mssql is NOT in the core DuckDB extension repo; it lives in the
+        # community repo. dbt-duckdb's Extension dataclass takes `name`
+        # and `repo` (NOT `repository` -- the wrong key triggers
+        # "Failed to parse extension: Extension.__init__() got an
+        # unexpected keyword argument 'repository'") and emits
+        # `INSTALL mssql FROM community`.
+        - name: mssql
+          repo: community
+      secrets:
+        - type: azure
+          provider: config
+          account_name: azureopendatastorage
+      settings:
+        azure_transport_option_type: 'curl'
+        # Path to a CA bundle DuckDB's azure extension uses for TLS.
+        # Override with AZURE_CA_CERT_FILE in .env (default suits debian/ubuntu).
+        ca_cert_file: "{{ env_var('AZURE_CA_CERT_FILE', '/etc/ssl/certs/ca-certificates.crt') }}"
+      attach:
+        - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
+          type: mssql
+          alias: Referensdata

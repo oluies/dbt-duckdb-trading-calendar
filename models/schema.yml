@@ -1,0 +1,140 @@
+version: 2
+
+models:
+
+  - name: stg_public_holidays
+    description: >
+      Filtered, snake-cased view of the Azure Open Datasets "Public Holidays"
+      parquet feed (1970-2099 snapshot, CC BY-SA 3.0).
+    columns:
+      - name: country_region_code
+        description: ISO 3166-1 alpha-2 country code.
+        tests:
+          - not_null
+      - name: holiday_date
+        tests:
+          - not_null
+
+  - name: dim_date
+    description: >
+      Country-agnostic calendar dimension, one row per day from 2015-01-01
+      through 2035-12-31. No holiday flags -- use fct_holiday_calendar.
+    columns:
+      - name: date_key
+        description: Integer surrogate key YYYYMMDD.
+        tests:
+          - unique
+          - not_null
+      - name: date_day
+        description: The calendar date.
+        tests:
+          - unique
+          - not_null
+      - name: iso_day_of_week
+        description: 1=Monday..7=Sunday, independent of SET DATEFIRST.
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 7]
+              quote: false
+
+  - name: fct_holiday_calendar
+    description: >
+      Public holiday fact. Grain = (holiday_date, country_code).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - holiday_date
+            - country_code
+    columns:
+      - name: holiday_key
+        tests:
+          - unique
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      - name: country_code
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_country')
+              field: country_code
+      - name: holiday_date
+        tests:
+          - not_null
+      - name: holiday_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['public_holiday']
+
+  - name: fct_exchange_calendar
+    description: >
+      Trading-calendar fact. Grain = (calendar_date, exchange_code).
+      Lists exception days only (closures and unusual sessions); regular
+      trading days are implicit (absence of a row plus weekday from
+      dim_date).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - calendar_date
+            - exchange_code
+    columns:
+      - name: exchange_key
+        tests:
+          - unique
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_key
+      - name: exchange_code
+        tests:
+          - not_null
+      - name: country_code
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_country')
+              field: country_code
+
+seeds:
+
+  - name: dim_country
+    description: >
+      Country dimension. ISO 3166-1 alpha-2 codes paired with display names.
+      Must contain at least every code in var('holiday_country_codes').
+    columns:
+      - name: country_code
+        tests:
+          - unique
+          - not_null
+          - accepted_values:
+              values: "{{ var('holiday_country_codes') }}"
+      - name: country_name
+        tests:
+          - not_null
+
+  - name: exchange_holidays
+    description: >
+      Seed of exchange exception days. Edited by hand. country_code must
+      reference dim_country.
+    columns:
+      - name: calendar_date
+        tests:
+          - not_null
+      - name: exchange_code
+        tests:
+          - not_null
+      - name: country_code
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_country')
+              field: country_code

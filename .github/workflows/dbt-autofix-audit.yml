@@ -1,0 +1,102 @@
+name: dbt-autofix audit
+
+# Runs `uvx dbt-autofix deprecations --dry-run` against the dbt project
+# whenever PR changes touch dbt configuration, models, macros, or this
+# workflow file. Surfaces any deprecation suggestions in the workflow run
+# summary plus a downloadable artifact, so reviewers can see deprecations
+# *introduced by the PR* before merging.
+#
+# Manual via the Actions tab too. No cron — autofix only matters when
+# something changes (model code, project config, or the dbt-core
+# version in requirements.txt). All three are PR-trigger paths below.
+#
+# NOT a required check. Findings are informational; the PR author / reviewer
+# decides whether to apply them.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "dbt_project.yml"
+      - "models/**"
+      - "macros/**"
+      - "seeds/**"
+      - "requirements.txt"
+      - ".github/workflows/dbt-autofix-audit.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: dbt-autofix deprecations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Run dbt-autofix (dry-run)
+        id: autofix
+        # --dry-run never modifies files. We strip ANSI escapes from the
+        # output so the artifact reads cleanly and the workflow summary
+        # renders properly. Exit 0 always so a flagged deprecation is
+        # informational, not a hard failure.
+        #
+        # COLUMNS=200 + NO_COLOR=1 stop Typer/Rich from wrapping long
+        # paths across lines, which lets the filter below match each
+        # "Warning: Path … does not exist" message on a single line.
+        # We strip those: dbt-autofix scans every default project dir
+        # (snapshots, tests, analyses, …) and warns about any that
+        # don't exist on disk. We don't use most of them.
+        env:
+          COLUMNS: "200"
+          NO_COLOR: "1"
+        run: |
+          set -uo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/audit"
+          log="${GITHUB_WORKSPACE}/audit/holiday_loader.log"
+          uvx dbt-autofix deprecations --dry-run 2>&1 \
+            | sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' \
+            | grep -vE '^Warning: Path .* does not exist$' \
+            | tee "$log"
+          # grep returning 1 (no matches) is fine; |& tee swallows it.
+          true
+
+      - name: Render summary
+        if: always()
+        run: |
+          log="${GITHUB_WORKSPACE}/audit/holiday_loader.log"
+          {
+            echo "### dbt-autofix deprecations — \`holiday_loader\`"
+            echo
+            if [[ -s "$log" ]]; then
+              # Heuristic flag for "found something interesting"
+              if grep -qE 'NOT APPLIED|Refactored|deprecation|Error processing' "$log"; then
+                echo "⚠️ Suggestions surfaced. See log below or download the artifact."
+              else
+                echo "✅ No deprecation suggestions."
+              fi
+              echo
+              echo '```'
+              tail -80 "$log"
+              echo '```'
+            else
+              echo "_No output captured — see workflow logs._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload audit log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-autofix-holiday_loader-${{ github.run_id }}
+          path: audit/holiday_loader.log
+          retention-days: 30
+          if-no-files-found: warn

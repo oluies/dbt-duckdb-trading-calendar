@@ -1,0 +1,46 @@
+version: 2
+
+updates:
+  # Python deps (dbt-core, dbt-duckdb, duckdb).
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+    # Group dbt packages so a dbt-core bump and a dbt-duckdb bump
+    # land in one PR — they almost always need to move together.
+    groups:
+      dbt:
+        patterns:
+          - "dbt-*"
+          - "duckdb"
+
+  # GitHub Actions used by the workflows in this repo.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # docker-compose base images (SQL Server 2022 + Azure SQL Edge).
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"

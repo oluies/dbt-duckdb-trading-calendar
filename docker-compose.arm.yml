@@ -1,0 +1,54 @@
+# Apple Silicon / arm64 variant.
+#
+# The official mcr.microsoft.com/mssql/server:2022-latest image is
+# linux/amd64 only -- on an M-series Mac it runs via Rosetta emulation
+# (slow, occasionally flaky on Docker Desktop). This compose file swaps
+# in Azure SQL Edge, which Microsoft ships natively for linux/arm64.
+#
+# Caveats noted in README:
+#   * Azure SQL Edge has been announced end-of-support (Sept 2025);
+#     it's still the practical native-arm64 dev option in 2026, but is
+#     not for production.
+#   * Its sqlcmd lives at /opt/mssql-tools/bin/sqlcmd (no "18"). The
+#     Makefile picks the right binary via PLATFORM=arm-mac.
+#   * The wire protocol is SQL Server-compatible, so dbt-duckdb's mssql
+#     ATTACH driver talks to it unchanged.
+#
+# Usage:
+#   make PLATFORM=arm-mac db-up
+#   make PLATFORM=arm-mac db-init
+#   make PLATFORM=arm-mac db-shell
+
+services:
+  mssql:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    platform: linux/arm64
+    container_name: holiday_loader_mssql
+    environment:
+      ACCEPT_EULA: "1"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD:?SA_PASSWORD must be set in .env}
+      SA_PASSWORD: ${SA_PASSWORD:?SA_PASSWORD must be set in .env}
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    # Azure SQL Edge ships sqlcmd at the older path. The healthcheck
+    # tolerates either by trying both, so the same compose file works
+    # if Microsoft updates the bundled tools.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          (
+            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b -l 5
+            || /opt/mssql-tools/bin/sqlcmd   -S localhost -U sa -P "$$MSSQL_SA_PASSWORD"    -Q "SELECT 1" -b -l 5
+          ) || exit 1
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mssql_data:
+    name: holiday_loader_mssql_data
