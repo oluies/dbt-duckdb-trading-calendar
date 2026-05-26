@@ -8,7 +8,12 @@ holiday_loader:
       extensions:
         - httpfs
         - azure
-        - mssql
+        # mssql is NOT in the core DuckDB extension repo; it lives in the
+        # community repo. Without `repository: community` the extension
+        # loader hits extensions.duckdb.org/.../mssql.duckdb_extension.gz
+        # and returns HTTP 404.
+        - name: mssql
+          repository: community
       secrets:
         - type: azure
           provider: config
