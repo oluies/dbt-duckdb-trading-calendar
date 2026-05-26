@@ -18,8 +18,16 @@ clean-targets:
 
 # Country codes whose holidays are loaded into fct_holiday_calendar.
 # dim_country must contain at least these codes.
+#
+# calendar_start_date / calendar_end_date bound BOTH the date spine
+# (and thus dim_date) AND the holiday staging filter, so the
+# fct_holiday_calendar -> dim_date relationship test never fails on
+# pre-spine or post-spine rows. End is half-open (exclusive), matching
+# dbt_utils.date_spine.
 vars:
   holiday_country_codes: ['SE', 'NO', 'DK', 'FI', 'GB', 'US']
+  calendar_start_date: '2015-01-01'
+  calendar_end_date:   '2036-01-01'
 
 models:
   holiday_loader:

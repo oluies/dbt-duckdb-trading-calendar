@@ -15,6 +15,12 @@ with source as (
             '{{ code }}'{% if not loop.last %}, {% endif %}
         {%- endfor -%}
     )
+      -- Clip to the same horizon as the date spine. The upstream
+      -- parquet is a 1970-2099 snapshot; rows outside the spine have
+      -- no matching dim_date row and would fail the
+      -- fct_holiday_calendar -> dim_date relationships test.
+      and cast(date as date) >= cast('{{ var("calendar_start_date") }}' as date)
+      and cast(date as date) <  cast('{{ var("calendar_end_date")   }}' as date)
 
 )
 
