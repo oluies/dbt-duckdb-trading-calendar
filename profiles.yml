@@ -1,0 +1,24 @@
+holiday_loader:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'holiday_loader.duckdb'
+      threads: 4
+      extensions:
+        - httpfs
+        - azure
+        - mssql
+      secrets:
+        - type: azure
+          provider: config
+          account_name: azureopendatastorage
+      settings:
+        azure_transport_option_type: 'curl'
+        # Path to a CA bundle DuckDB's azure extension uses for TLS.
+        # Override with AZURE_CA_CERT_FILE in .env (default suits debian/ubuntu).
+        ca_cert_file: "{{ env_var('AZURE_CA_CERT_FILE', '/etc/ssl/certs/ca-certificates.crt') }}"
+      attach:
+        - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
+          type: mssql
+          alias: Referensdata

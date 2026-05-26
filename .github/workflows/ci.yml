@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Match what .env.example shows — never a real credential, only used
+  # for the throwaway SQL Server service started in this workflow.
+  SA_PASSWORD: CI_Str0ng_P@ssword_2026!
+  AZURE_CA_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+  DBT_PROFILES_DIR: ${{ github.workspace }}
+
+jobs:
+  build:
+    name: dbt build + test against SQL Server 2022
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Write .env for docker compose + Make
+        run: |
+          cat > .env <<EOF
+          SA_PASSWORD=${SA_PASSWORD}
+          AZURE_CA_CERT_FILE=${AZURE_CA_CERT_FILE}
+          EOF
+
+      - name: Start SQL Server (docker compose)
+        run: make db-up
+
+      - name: Create Referensdata database + azuredl schema
+        run: make db-init
+
+      - name: Install dbt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt seed
+        run: dbt seed
+
+      - name: dbt run
+        run: dbt run
+
+      - name: dbt test
+        run: dbt test
+
+      - name: Dump SQL Server logs on failure
+        if: failure()
+        run: make db-logs &
+        # ^ best-effort, doesn't block the job
+
+      - name: Tear down
+        if: always()
+        run: make db-down || true

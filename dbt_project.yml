@@ -1,0 +1,51 @@
+name: 'holiday_loader'
+version: '1.0.0'
+config-version: 2
+
+profile: 'holiday_loader'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Country codes whose holidays are loaded into fct_holiday_calendar.
+# dim_country must contain at least these codes.
+vars:
+  holiday_country_codes: ['SE', 'NO', 'DK', 'FI', 'GB', 'US']
+
+models:
+  holiday_loader:
+    +database: Referensdata
+    +schema: azuredl
+    +materialized: table
+    staging:
+      stg_public_holidays:
+        +materialized: table
+      stg_date_spine:
+        +materialized: ephemeral
+    marts:
+      +materialized: table
+
+seeds:
+  holiday_loader:
+    +database: Referensdata
+    +schema: azuredl
+    dim_country:
+      +column_types:
+        country_code: varchar(2)
+        country_name: varchar(100)
+    exchange_holidays:
+      +column_types:
+        calendar_date: date
+        exchange_code: varchar(8)
+        exchange_name: varchar(100)
+        country_code: varchar(2)
+        holiday_name: varchar(200)
