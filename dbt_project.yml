@@ -28,6 +28,11 @@ vars:
   holiday_country_codes: ['SE', 'NO', 'DK', 'FI', 'GB', 'US']
   calendar_start_date: '2015-01-01'
   calendar_end_date:   '2036-01-01'
+  # Toggle for the elementary OSS observability package. Off by default
+  # so the main CI / local dev runs are unaffected by elementary's tables
+  # and ingest models. The .github/workflows/elementary.yml job flips
+  # this to true and then publishes an HTML report via `edr report`.
+  with_elementary: false
 
 models:
   holiday_loader:
@@ -41,6 +46,14 @@ models:
         +materialized: ephemeral
     marts:
       +materialized: table
+  # Elementary OSS package -- observability tables that ingest dbt
+  # run/test artifacts. Disabled unless var('with_elementary') is true.
+  # Lives in Referensdata.elementary (pre-created by the elementary.yml
+  # workflow) so it never collides with the user-facing azuredl schema.
+  elementary:
+    +enabled: "{{ var('with_elementary', false) }}"
+    +database: Referensdata
+    +schema: elementary
 
 seeds:
   holiday_loader:
@@ -57,3 +70,7 @@ seeds:
         exchange_name: varchar(100)
         country_code: varchar(2)
         holiday_name: varchar(200)
+  elementary:
+    +enabled: "{{ var('with_elementary', false) }}"
+    +database: Referensdata
+    +schema: elementary

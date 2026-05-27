@@ -191,6 +191,42 @@ days for 2024–2026 as a worked example.
 
 ---
 
+## Observability (Elementary OSS)
+
+The [`elementary-data/elementary`](https://docs.elementary-data.com/oss/oss-introduction)
+package is wired up but **disabled by default**. The
+`.github/workflows/elementary.yml` workflow flips the gating var
+(`with_elementary: true`), builds elementary's tables into
+`Referensdata.elementary`, and publishes the resulting HTML report
+(models, tests, lineage, run history) as a workflow artifact.
+
+Triggered manually (`workflow_dispatch`), on push to `main`, and on a
+weekly schedule. The main `ci.yml` is unaffected.
+
+To generate locally:
+
+```bash
+pip install -r requirements-elementary.txt
+dbt deps
+dbt seed --vars '{with_elementary: true}'
+dbt run  --vars '{with_elementary: true}'
+dbt test --vars '{with_elementary: true}' || true
+dbt run  --select package:elementary --vars '{with_elementary: true}'
+edr report --profiles-dir "$PWD" --profile-target dev \
+  --file-path elementary-report/index.html
+open elementary-report/index.html
+```
+
+You'll need to pre-create the schema once:
+
+```sql
+USE Referensdata;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'elementary')
+    EXEC('CREATE SCHEMA elementary');
+```
+
+---
+
 ## Notes / decisions
 
 ### Source of holiday data

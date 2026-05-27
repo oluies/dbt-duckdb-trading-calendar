@@ -1,0 +1,134 @@
+name: Elementary report
+
+# Runs the full dbt pipeline with the elementary OSS observability
+# package enabled, then publishes an HTML report (models, tests, runs,
+# lineage) as a workflow artifact.
+#
+# Separate from ci.yml so the main PR pipeline stays fast and
+# elementary's setup never blocks a merge. Triggered manually plus on
+# push to main (informational) and a weekly schedule (so the report
+# captures recent history even when no code changes).
+#
+# Implementation notes
+# --------------------
+# * `with_elementary: true` is passed to every dbt invocation. The
+#   project's elementary models + seeds are +enabled gated on that var,
+#   so the package is inert in any other workflow.
+# * Elementary's ingest is incremental: a `dbt run` reads the PREVIOUS
+#   run's target/run_results.json. That's why this workflow runs dbt
+#   twice -- first to materialise everything, then a targeted second
+#   pass over `package:elementary` to ingest the just-completed run+
+#   test artifacts before `edr report`.
+# * `dbt test` runs with continue-on-error so a failing project test
+#   doesn't stop the report from being generated -- the report is
+#   exactly the thing you want to look at when a test fails.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  schedule:
+    # Mondays 06:00 UTC. Aligns with the dependabot weekly cadence.
+    - cron: "0 6 * * 1"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Throwaway SQL Server credential for the ephemeral container started
+  # below. Never a real password.
+  SA_PASSWORD: Elementary_Str0ng_P@ssword_2026!
+  AZURE_CA_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+  DBT_PROFILES_DIR: ${{ github.workspace }}
+
+jobs:
+  report:
+    name: dbt + elementary -> HTML report
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-elementary.txt
+
+      - name: Write .env
+        run: |
+          cat > .env <<EOF
+          SA_PASSWORD=${SA_PASSWORD}
+          AZURE_CA_CERT_FILE=${AZURE_CA_CERT_FILE}
+          EOF
+
+      - name: Start SQL Server (docker compose)
+        run: make db-up
+
+      - name: Create Referensdata + azuredl + elementary schemas
+        # db-init handles Referensdata + azuredl. Elementary's tables
+        # land in Referensdata.elementary (configured in dbt_project.yml).
+        # dbt won't issue CREATE SCHEMA against the attached SQL Server,
+        # so we pre-create it here, mirroring the db-init pattern.
+        run: |
+          make db-init
+          docker compose exec -T mssql /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$SA_PASSWORD" -C -b -d Referensdata -Q \
+            "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'elementary') EXEC('CREATE SCHEMA elementary');"
+
+      - name: Install dbt + edr
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-elementary.txt
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt seed (with elementary)
+        run: dbt seed --vars '{with_elementary: true}'
+
+      - name: dbt run (project + elementary)
+        run: dbt run --vars '{with_elementary: true}'
+
+      - name: dbt test
+        # continue-on-error so the report below is generated even when
+        # a project test fails -- that's when the report is most useful.
+        continue-on-error: true
+        run: dbt test --vars '{with_elementary: true}'
+
+      - name: dbt run (re-ingest elementary)
+        # Second pass over the elementary package only, so its
+        # incremental models pick up the run+test artifacts that the
+        # preceding steps just wrote to target/.
+        run: dbt run --select package:elementary --vars '{with_elementary: true}'
+
+      - name: Generate Elementary HTML report
+        run: |
+          mkdir -p elementary-report
+          edr report \
+            --profiles-dir "$DBT_PROFILES_DIR" \
+            --profile-target dev \
+            --file-path elementary-report/index.html
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: elementary-report-${{ github.run_id }}
+          path: elementary-report/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Dump SQL Server logs on failure
+        if: failure()
+        run: docker compose logs mssql --no-color --tail 200
+
+      - name: Tear down
+        if: always()
+        run: make db-down || true
