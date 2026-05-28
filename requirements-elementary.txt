@@ -1,0 +1,8 @@
+# Extra deps only needed by the elementary.yml workflow (and locally
+# when you want to generate the HTML observability report). Kept out
+# of requirements.txt so the main CI install stays lean.
+#
+# The [duckdb] extras pull elementary's DuckDB-adapter glue. The
+# version should track packages.yml's elementary-data/elementary pin
+# -- dependabot updates both together via the `pip` and `dbt` groups.
+elementary-data[duckdb]==0.23.4

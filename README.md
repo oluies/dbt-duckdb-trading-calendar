@@ -139,7 +139,30 @@ Normalized, Kimball-style. **No** wide per-country boolean columns on
   from `dbt_utils.date_spine`.
 - **`dim_date`** – country-agnostic, one row per day. `iso_day_of_week`
   uses DuckDB's `isodow()`, which always returns 1=Monday..7=Sunday and
-  does NOT depend on any `SET DATEFIRST` / locale setting.
+  does NOT depend on any `SET DATEFIRST` / locale setting. ISO 8601
+  week semantics are completed by `iso_week_number`, `iso_year`, and
+  the text key `iso_year_week` ('2026-W01').
+
+  Includes **ML feature columns** alongside the standard dim columns:
+
+  - cycle-position booleans: `is_month_start`, `is_month_end`,
+    `is_quarter_start`, `is_quarter_end`, `is_year_start`, `is_year_end`,
+    plus `week_of_month` (1..5).
+  - distance integers: `days_since_year_start`, `days_to_year_end`
+    (both 0 on their boundary day).
+  - cyclical encodings: `dow_sin/cos`, `month_sin/cos`, `doy_sin/cos`.
+    Each `(sin, cos)` pair maps an ordinal onto the unit circle so the
+    first and last value of the cycle sit adjacent (Sun -> Mon = 1 step,
+    Dec -> Jan = 1 step) instead of being maximally apart. Useful for
+    linear models, and as input features for tree models that don't
+    natively model cycles. Day-of-year uses period 365.25 to average
+    across the leap cycle. See scikit-learn's [Time-related feature
+    engineering](https://scikit-learn.org/stable/auto_examples/applications/plot_cyclical_feature_engineering.html)
+    example for the canonical pattern.
+
+  We deliberately do NOT one-hot day_name / month_name / quarter into
+  the dim -- modern ML frameworks accept integers, and one-hot at the
+  warehouse layer couples the schema to a specific feature pipeline.
 - **`dim_country`** – seeded from `seeds/dim_country.csv`. One row per
   country in `var('holiday_country_codes')`.
 - **`fct_holiday_calendar`** – grain `(holiday_date, country_code)`.
@@ -188,6 +211,42 @@ days for 2024–2026 as a worked example.
   `accepted_values` on `holiday_type`
 - `fct_exchange_calendar` – unique combination `(calendar_date,
   exchange_code)`; relationships on `date_key` and `country_code`
+
+---
+
+## Observability (Elementary OSS)
+
+The [`elementary-data/elementary`](https://docs.elementary-data.com/oss/oss-introduction)
+package is wired up but **disabled by default**. The
+`.github/workflows/elementary.yml` workflow flips the gating var
+(`with_elementary: true`), builds elementary's tables into
+`Referensdata.elementary`, and publishes the resulting HTML report
+(models, tests, lineage, run history) as a workflow artifact.
+
+Triggered manually (`workflow_dispatch`), on push to `main`, and on a
+weekly schedule. The main `ci.yml` is unaffected.
+
+To generate locally:
+
+```bash
+pip install -r requirements-elementary.txt
+dbt deps
+dbt seed --vars '{with_elementary: true}'
+dbt run  --vars '{with_elementary: true}'
+dbt test --vars '{with_elementary: true}' || true
+dbt run  --select package:elementary --vars '{with_elementary: true}'
+edr report --profiles-dir "$PWD" --profile-target dev \
+  --file-path elementary-report/index.html
+open elementary-report/index.html
+```
+
+You'll need to pre-create the schema once:
+
+```sql
+USE Referensdata;
+IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'elementary')
+    EXEC('CREATE SCHEMA elementary');
+```
 
 ---
 

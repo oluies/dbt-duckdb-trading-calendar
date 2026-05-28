@@ -8,9 +8,14 @@ holiday_loader:
       # safe under concurrent reads against an attached SQL Server --
       # `dbt test` with threads >= 2 segfaults the worker process
       # mid-suite (exit 139, leaked semaphores). One thread takes a
-      # little longer but completes deterministically. Override locally
-      # at your own risk via DBT_THREADS=N if/when the extension
-      # stabilises.
+      # little longer but completes deterministically.
+      #
+      # Fix tracking: https://github.com/hugr-lab/mssql-extension/pull/127
+      #   ("Thread-safe catalog entry lifetime") -- addresses the exact
+      #   use-after-free in concurrent catalog loads that produces the
+      #   segfault. Once that PR ships in a tagged release, bump this to
+      #   `threads: 4`, run the full CI matrix, and remove this comment
+      #   block if `dbt test` is stable.
       threads: 1
       extensions:
         - httpfs

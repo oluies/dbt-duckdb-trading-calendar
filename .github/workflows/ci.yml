@@ -65,8 +65,10 @@ jobs:
 
       - name: Dump SQL Server logs on failure
         if: failure()
-        run: make db-logs &
-        # ^ best-effort, doesn't block the job
+        # One-shot (no -f). Previously this backgrounded `make db-logs`
+        # which runs `docker compose logs -f` — the follow would be
+        # killed before any output flushed, so the step printed nothing.
+        run: docker compose logs mssql --no-color --tail 200
 
       - name: Tear down
         if: always()
