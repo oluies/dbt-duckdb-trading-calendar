@@ -48,12 +48,27 @@ models:
       +materialized: table
   # Elementary OSS package -- observability tables that ingest dbt
   # run/test artifacts. Disabled unless var('with_elementary') is true.
-  # Lives in Referensdata.elementary (pre-created by the elementary.yml
-  # workflow) so it never collides with the user-facing azuredl schema.
+  #
+  # +schema: elementary composes with target.schema (dbt-duckdb default
+  # 'main') into the actual schema name `main_elementary`. dbt-duckdb
+  # auto-creates that schema inside the attached SQL Server -- nothing
+  # to pre-create.
+  #
+  # +materialized: table overrides elementary's default incremental
+  # materialization. Reason: dbt-duckdb's incremental path issues a
+  # COMMIT against the connection after the MERGE, but the community
+  # mssql ATTACH auto-commits MERGE itself, so the explicit COMMIT
+  # raises `Tried to commit transaction on connection ... but it does
+  # not have one open!` (dbt/adapters/duckdb/impl.py:300) and fails
+  # the whole `dbt run`. Table materialization avoids the merge path
+  # entirely. We lose elementary's run-history accumulation, but the
+  # CI's SQL Server container is ephemeral so there's no history to
+  # accumulate anyway.
   elementary:
     +enabled: "{{ var('with_elementary', false) }}"
     +database: Referensdata
     +schema: elementary
+    +materialized: table
 
 seeds:
   holiday_loader:

@@ -71,16 +71,13 @@ jobs:
       - name: Start SQL Server (docker compose)
         run: make db-up
 
-      - name: Create Referensdata + azuredl + elementary schemas
+      - name: Create Referensdata + azuredl schemas
         # db-init handles Referensdata + azuredl. Elementary's tables
-        # land in Referensdata.elementary (configured in dbt_project.yml).
-        # dbt won't issue CREATE SCHEMA against the attached SQL Server,
-        # so we pre-create it here, mirroring the db-init pattern.
-        run: |
-          make db-init
-          docker compose exec -T mssql /opt/mssql-tools18/bin/sqlcmd \
-            -S localhost -U sa -P "$SA_PASSWORD" -C -b -d Referensdata -Q \
-            "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'elementary') EXEC('CREATE SCHEMA elementary');"
+        # land in Referensdata.main_elementary (`+schema: elementary`
+        # composes with target.schema=main). dbt-duckdb auto-creates
+        # that schema inside the attached SQL Server -- no pre-create
+        # step needed.
+        run: make db-init
 
       - name: Install dbt + edr
         run: |
