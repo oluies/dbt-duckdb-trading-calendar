@@ -91,46 +91,74 @@ make db-up && make db-init && \
 Normalized, Kimball-style. **No** wide per-country boolean columns on
 `dim_date`.
 
-```
-                          +--------------------+
-                          |     dim_date       |
-                          |--------------------|
-                          | date_key  (PK)     |
-                          | date_day           |
-                          | year/quarter/month |
-                          | day_of_year        |
-                          | iso_week_number    |
-                          | iso_day_of_week    |  (1=Mon..7=Sun)
-                          | month_name         |
-                          | day_name           |
-                          | first/last_of_month|
-                          | is_weekend         |
-                          +---------+----------+
-                                    ^
-                                    | date_key
-              +---------------------+---------------------+
-              |                                           |
-   +----------+-------------+                +-----------+-----------+
-   | fct_holiday_calendar   |                | fct_exchange_calendar |
-   |------------------------|                |-----------------------|
-   | holiday_key  (PK, sk)  |                | exchange_key (PK, sk) |
-   | date_key      (FK)     |                | date_key      (FK)    |
-   | country_code  (FK)     |                | calendar_date         |
-   | holiday_date           |                | exchange_code         |
-   | holiday_name           |                | exchange_name         |
-   | is_observed            |                | country_code  (FK)    |
-   | is_paid_time_off       |                | is_trading_day        |
-   | holiday_type           |                | is_settlement_day     |
-   +-----------+------------+                | holiday_name (nullable)
-               |                             +-----------+-----------+
-               | country_code                            |
-               v                                         | country_code
-       +---------------+                                 |
-       |  dim_country  |<--------------------------------+
-       |---------------|
-       | country_code  (PK, ISO 3166-1 alpha-2)
-       | country_name
-       +---------------+
+```mermaid
+erDiagram
+    DIM_DATE {
+        int date_key PK "YYYYMMDD"
+        date date_day
+        int year_number
+        int quarter_number
+        int month_number
+        int day_of_month
+        int day_of_year
+        int iso_week_number "1..53"
+        int iso_year "ISO week-based year"
+        varchar iso_year_week "e.g. 2026-W01"
+        varchar month_name
+        varchar day_name
+        int iso_day_of_week "1=Mon..7=Sun"
+        date first_day_of_month
+        date last_day_of_month
+        date first_day_of_quarter
+        date last_day_of_quarter
+        date first_day_of_year
+        date last_day_of_year
+        boolean is_weekend
+        boolean is_month_start
+        boolean is_month_end
+        boolean is_quarter_start
+        boolean is_quarter_end
+        boolean is_year_start
+        boolean is_year_end
+        int week_of_month "1..5"
+        int days_since_year_start "ML distance"
+        int days_to_year_end "ML distance"
+        double dow_sin "cyclical"
+        double dow_cos
+        double month_sin
+        double month_cos
+        double doy_sin
+        double doy_cos
+    }
+    DIM_COUNTRY {
+        varchar country_code PK "ISO 3166-1 alpha-2"
+        varchar country_name
+    }
+    FCT_HOLIDAY_CALENDAR {
+        varchar holiday_key PK "surrogate"
+        int date_key FK
+        varchar country_code FK
+        date holiday_date
+        varchar holiday_name
+        boolean is_observed
+        boolean is_paid_time_off
+        varchar holiday_type "public_holiday"
+    }
+    FCT_EXCHANGE_CALENDAR {
+        varchar exchange_key PK "surrogate"
+        int date_key FK
+        date calendar_date
+        varchar exchange_code
+        varchar exchange_name
+        varchar country_code FK
+        boolean is_trading_day
+        boolean is_settlement_day
+        varchar holiday_name "nullable"
+    }
+    DIM_DATE ||--o{ FCT_HOLIDAY_CALENDAR  : "date_key"
+    DIM_DATE ||--o{ FCT_EXCHANGE_CALENDAR : "date_key"
+    DIM_COUNTRY ||--o{ FCT_HOLIDAY_CALENDAR  : "country_code"
+    DIM_COUNTRY ||--o{ FCT_EXCHANGE_CALENDAR : "country_code"
 ```
 
 - **`stg_public_holidays`** – staging view of the Azure parquet, filtered
