@@ -107,6 +107,18 @@ holiday_loader:
 #
 # threads: 1 for the same reason as dev -- the community mssql extension is not
 # safe under concurrent reads against the attached SQL Server.
+# ---------------------------------------------------------------------------
+# Elementary CLI (`edr report`) profile.
+#
+# `edr report` runs Elementary's OWN bundled dbt project, which hardcodes
+# `profile: elementary`. Without this block edr fails with
+# `Could not find profile named 'elementary'`.
+#
+# This is a PURE LOCAL DuckDB connection -- no attach, no mssql extension.
+# The elementary models are materialised into the DuckDB file (schema
+# `main_elementary`; see dbt_project.yml), so edr reads native DuckDB tables.
+# It must NOT attach SQL Server: edr's read queries against the attached
+# server segfault the community mssql extension (exit 139).
 elementary:
   target: dev
   outputs:
@@ -114,21 +126,4 @@ elementary:
       type: duckdb
       path: 'holiday_loader.duckdb'
       threads: 1
-      database: Referensdata
       schema: main_elementary
-      extensions:
-        - httpfs
-        - azure
-        - name: mssql
-          repo: community
-      secrets:
-        - type: azure
-          provider: config
-          account_name: azureopendatastorage
-      settings:
-        azure_transport_option_type: 'curl'
-        ca_cert_file: "{{ env_var('AZURE_CA_CERT_FILE', '/etc/ssl/certs/ca-certificates.crt') }}"
-      attach:
-        - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
-          type: mssql
-          alias: Referensdata
