@@ -1,5 +1,12 @@
 # dbt-duckdb-trading-calendar
 
+[![CI](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/ci.yml)
+[![Elementary report](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml)
+[![dbt-core](https://img.shields.io/badge/dbt--core-1.11.11-FF694B?logo=dbt&logoColor=white)](https://github.com/dbt-labs/dbt-core)
+[![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.10.1-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb)
+[![DuckDB](https://img.shields.io/badge/DuckDB-engine-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org)
+[![DuckDB mssql extension](https://img.shields.io/badge/DuckDB%20mssql%20ext-community-blue?logo=microsoftsqlserver&logoColor=white)](https://github.com/hugr-lab/mssql-extension)
+
 A dbt project that builds a **date dimension** plus a **normalized,
 Kimball-style holiday and exchange calendar** in SQL Server 2022,
 using **DuckDB** (via `dbt-duckdb`) as the compute engine.
