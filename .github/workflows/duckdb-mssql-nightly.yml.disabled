@@ -1,40 +1,43 @@
-name: DuckDB+mssql nightly stress
+# ARCHIVED: this file's extension is `.yml.disabled`, so GitHub
+# Actions ignores it. Rename back to `.yml` to reactivate.
+#
+# Why archived
+# ------------
+# DuckDB extensions are ABI-coupled to libduckdb. The mssql binary
+# from upstream hugr-lab/mssql-extension CI is built against the
+# duckdb submodule pinned to commit f480e78 (a 2026-02-13 dev
+# snapshot from duckdb/main), not a tagged release. Our pip-installed
+# duckdb is the released 1.5.x line, so loading the upstream binary
+# fails with "extension built for different DuckDB version".
+#
+# Two dispatched runs confirmed this:
+#   * 26600211537 -- failed at config parse (Extension.__init__()
+#     missing 'repo', fixed by adding repo: community)
+#   * 26601550510 -- failed at the verify step on a SET-after-connect
+#     bug, with the real ABI mismatch underneath.
+#
+# When to reactivate
+# ------------------
+# When the upstream PR (https://github.com/hugr-lab/mssql-extension/pull/127)
+# ships in a tagged community-repo release. At that point the
+# workflow's premise (pre-place a freshly built binary against pip
+# duckdb) goes away -- just bump profiles.yml's dev target from
+# threads: 1 to threads: 4, the community-installed extension is
+# already the right one. The `nightly` profile target stays as a
+# local convenience for `DBT_THREADS=N dbt run --target nightly`
+# once the released extension is the right one.
+#
+# To reactivate:
+#   git mv duckdb-mssql-nightly.yml.disabled duckdb-mssql-nightly.yml
+# Then drop this comment block.
+#
+# Original behaviour (kept below for restoration)
+# ------------------------------------------------
+# Re-runs the full dbt pipeline at threads=4 and threads=8 against a
+# freshly built mssql.duckdb_extension pulled from upstream
+# hugr-lab/mssql-extension CI artifacts. workflow_dispatch only.
 
-# Re-runs the full dbt pipeline (seed/run/test) at threads=4 and
-# threads=8 against a freshly built `mssql.duckdb_extension` pulled
-# from upstream hugr-lab/mssql-extension's CI artifacts.
-#
-# Why
-# ---
-# The community `mssql` extension currently segfaults under concurrent
-# reads against an attached SQL Server, so profiles.yml's `dev` target
-# pins threads=1. Upstream PR
-# https://github.com/hugr-lab/mssql-extension/pull/127 ("Thread-safe
-# catalog entry lifetime") fixes the exact use-after-free. This workflow
-# validates the fix BEFORE it ships in a tagged community-repo release,
-# by pulling the extension binary directly from a build run on the
-# upstream PR.
-#
-# How
-# ---
-# * `mssql-extension-linux_amd64` is downloaded from a chosen upstream
-#   run-id, unzipped, and the resulting `.duckdb_extension` file is
-#   placed in DuckDB's extension cache directory at the path DuckDB
-#   itself reports via `current_setting('extension_directory')`.
-# * dbt-duckdb is invoked with `--target nightly` (defined in
-#   profiles.yml). That target sets `allow_unsigned_extensions: true`
-#   and uses `extensions: - name: mssql` *without* `repo: community`,
-#   so dbt emits plain `INSTALL mssql; LOAD mssql` -- a no-op when the
-#   binary is already in the cache. With `repo: community` it would
-#   overwrite our pre-placed binary with the released community build.
-# * `dbt test` runs with `continue-on-error` because the whole point of
-#   this workflow is to learn *whether* tests pass at higher
-#   concurrency. A segfault still shows up in the step log + the SQL
-#   Server log dump on failure.
-#
-# Triggers: workflow_dispatch only. No schedule -- the upstream PR
-# moves on its own cadence and there's no reason to burn runner minutes
-# until a maintainer asks.
+name: DuckDB+mssql nightly stress (ARCHIVED)
 
 on:
   workflow_dispatch:

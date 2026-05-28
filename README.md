@@ -278,35 +278,33 @@ IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'elementary')
 
 ---
 
-## Nightly mssql-extension stress test
+## Nightly mssql-extension stress test (archived)
 
-`.github/workflows/duckdb-mssql-nightly.yml` re-runs the full pipeline
-at `threads=4` and `threads=8` against a freshly built
-`mssql.duckdb_extension` pulled directly from a chosen upstream
+`.github/workflows/duckdb-mssql-nightly.yml.disabled` is a dormant
+harness for re-running the full pipeline at `threads=4` and `threads=8`
+against a freshly built `mssql.duckdb_extension` pulled from upstream
 [`hugr-lab/mssql-extension`](https://github.com/hugr-lab/mssql-extension)
-CI run. Purpose: validate
+CI artifacts. The goal was to validate
 [PR #127](https://github.com/hugr-lab/mssql-extension/pull/127)
-("Thread-safe catalog entry lifetime") BEFORE it ships in a tagged
+("Thread-safe catalog entry lifetime") before it ships in a tagged
 community-repo release.
 
-Workflow is `workflow_dispatch` only -- no schedule, no auto-trigger.
-Inputs:
+It is **disabled** because DuckDB extensions are ABI-coupled to
+libduckdb, and the upstream build is against a duckdb-main snapshot
+(commit `f480e78`, 2026-02-13) -- not the released `1.5.x` line we
+get from pip. Loading the upstream binary into pip's duckdb fails
+with "extension built for different DuckDB version". Two dispatched
+runs confirmed this.
 
-- `run_id` -- the Actions run-id on `hugr-lab/mssql-extension` whose
-  `mssql-extension-linux_amd64` artifact you want to test (defaults to
-  the current build off PR #127).
-- `ref_note` -- short label that lands in the workflow summary so the
-  artifact's provenance is obvious in retrospect.
+**Reactivate** by renaming the file back to `.yml` once the upstream
+fix lands in a tagged community release -- at that point the workflow's
+premise (pre-place a freshly built binary) is no longer needed, and
+the simpler path is to bump `profiles.yml`'s `dev` target from
+`threads: 1` to `threads: 4`.
 
-The corresponding profile target lives in `profiles.yml` as `nightly`.
-It differs from `dev` in three ways: env-driven threads (`DBT_THREADS`,
-default 4), `allow_unsigned_extensions: true`, and the `mssql` extension
-entry has no `repo:` so dbt-duckdb doesn't `INSTALL ... FROM community`
-over the pre-placed binary.
-
-When PR #127 ships in a tagged release, bump the `dev` target's
-`threads:` from 1 to 4 and remove the comment block tracking the upstream
-fix; this workflow can be archived at that point.
+The `nightly` profile target in `profiles.yml` is kept as a local
+convenience for `DBT_THREADS=N dbt run --target nightly` once the
+fix is in the released community extension.
 
 ---
 
