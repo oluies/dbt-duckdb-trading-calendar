@@ -278,6 +278,38 @@ IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'elementary')
 
 ---
 
+## Nightly mssql-extension stress test
+
+`.github/workflows/duckdb-mssql-nightly.yml` re-runs the full pipeline
+at `threads=4` and `threads=8` against a freshly built
+`mssql.duckdb_extension` pulled directly from a chosen upstream
+[`hugr-lab/mssql-extension`](https://github.com/hugr-lab/mssql-extension)
+CI run. Purpose: validate
+[PR #127](https://github.com/hugr-lab/mssql-extension/pull/127)
+("Thread-safe catalog entry lifetime") BEFORE it ships in a tagged
+community-repo release.
+
+Workflow is `workflow_dispatch` only -- no schedule, no auto-trigger.
+Inputs:
+
+- `run_id` -- the Actions run-id on `hugr-lab/mssql-extension` whose
+  `mssql-extension-linux_amd64` artifact you want to test (defaults to
+  the current build off PR #127).
+- `ref_note` -- short label that lands in the workflow summary so the
+  artifact's provenance is obvious in retrospect.
+
+The corresponding profile target lives in `profiles.yml` as `nightly`.
+It differs from `dev` in three ways: env-driven threads (`DBT_THREADS`,
+default 4), `allow_unsigned_extensions: true`, and the `mssql` extension
+entry has no `repo:` so dbt-duckdb doesn't `INSTALL ... FROM community`
+over the pre-placed binary.
+
+When PR #127 ships in a tagged release, bump the `dev` target's
+`threads:` from 1 to 4 and remove the comment block tracking the upstream
+fix; this workflow can be archived at that point.
+
+---
+
 ## Notes / decisions
 
 ### Source of holiday data

@@ -1,0 +1,179 @@
+name: DuckDB+mssql nightly stress
+
+# Re-runs the full dbt pipeline (seed/run/test) at threads=4 and
+# threads=8 against a freshly built `mssql.duckdb_extension` pulled
+# from upstream hugr-lab/mssql-extension's CI artifacts.
+#
+# Why
+# ---
+# The community `mssql` extension currently segfaults under concurrent
+# reads against an attached SQL Server, so profiles.yml's `dev` target
+# pins threads=1. Upstream PR
+# https://github.com/hugr-lab/mssql-extension/pull/127 ("Thread-safe
+# catalog entry lifetime") fixes the exact use-after-free. This workflow
+# validates the fix BEFORE it ships in a tagged community-repo release,
+# by pulling the extension binary directly from a build run on the
+# upstream PR.
+#
+# How
+# ---
+# * `mssql-extension-linux_amd64` is downloaded from a chosen upstream
+#   run-id, unzipped, and the resulting `.duckdb_extension` file is
+#   placed in DuckDB's extension cache directory at the path DuckDB
+#   itself reports via `current_setting('extension_directory')`.
+# * dbt-duckdb is invoked with `--target nightly` (defined in
+#   profiles.yml). That target sets `allow_unsigned_extensions: true`
+#   and uses `extensions: - name: mssql` *without* `repo: community`,
+#   so dbt emits plain `INSTALL mssql; LOAD mssql` -- a no-op when the
+#   binary is already in the cache. With `repo: community` it would
+#   overwrite our pre-placed binary with the released community build.
+# * `dbt test` runs with `continue-on-error` because the whole point of
+#   this workflow is to learn *whether* tests pass at higher
+#   concurrency. A segfault still shows up in the step log + the SQL
+#   Server log dump on failure.
+#
+# Triggers: workflow_dispatch only. No schedule -- the upstream PR
+# moves on its own cadence and there's no reason to burn runner minutes
+# until a maintainer asks.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "hugr-lab/mssql-extension Actions run-id with the build artifact"
+        required: false
+        default: "26540442825"
+      ref_note:
+        description: "Short label for what this run-id is (shown in the summary)"
+        required: false
+        default: "PR #127 (thread-safe catalog entry lifetime)"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  # Needed for the workflow's GITHUB_TOKEN to read artifacts from
+  # public cross-repo runs via `gh run download`.
+  actions: read
+
+env:
+  SA_PASSWORD: Nightly_Str0ng_P@ssword_2026!
+  AZURE_CA_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+  DBT_PROFILES_DIR: ${{ github.workspace }}
+  UPSTREAM_RUN_ID: ${{ github.event.inputs.run_id }}
+  UPSTREAM_REPO: hugr-lab/mssql-extension
+  UPSTREAM_ARTIFACT: mssql-extension-linux_amd64
+
+jobs:
+  stress:
+    name: dbt @ threads=${{ matrix.threads }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        threads: [4, 8]
+    env:
+      DBT_THREADS: ${{ matrix.threads }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dbt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Download upstream mssql extension artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ext-download
+          echo "Downloading $UPSTREAM_ARTIFACT from $UPSTREAM_REPO run $UPSTREAM_RUN_ID"
+          gh run download "$UPSTREAM_RUN_ID" \
+            --repo "$UPSTREAM_REPO" \
+            --name "$UPSTREAM_ARTIFACT" \
+            --dir ext-download
+          ls -la ext-download
+          find ext-download -name '*.duckdb_extension' -printf '%p %s bytes\n'
+
+      - name: Place extension in DuckDB cache
+        # DuckDB's per-version extension cache lives at the path returned
+        # by `current_setting('extension_directory')`. Layout is:
+        #   <ext_dir>/<duckdb_version>/<platform>/<name>.duckdb_extension
+        # We resolve it dynamically so we don't have to keep a hard-coded
+        # path in lockstep with the duckdb pip pin.
+        run: |
+          python3 <<'PY'
+          import duckdb, os, shutil, glob, sys
+          con = duckdb.connect(':memory:')
+          ext_dir = con.execute("SELECT current_setting('extension_directory')").fetchone()[0]
+          ver     = duckdb.__version__
+          target_dir = os.path.join(ext_dir, f"v{ver}", "linux_amd64")
+          os.makedirs(target_dir, exist_ok=True)
+          srcs = glob.glob('ext-download/**/*.duckdb_extension', recursive=True)
+          if not srcs:
+              print("ERROR: no .duckdb_extension file found inside ext-download/", file=sys.stderr)
+              sys.exit(1)
+          for src in srcs:
+              dst = os.path.join(target_dir, os.path.basename(src))
+              shutil.copy2(src, dst)
+              print(f"placed {src} -> {dst}")
+          PY
+
+      - name: Write .env
+        run: |
+          cat > .env <<EOF
+          SA_PASSWORD=${SA_PASSWORD}
+          AZURE_CA_CERT_FILE=${AZURE_CA_CERT_FILE}
+          EOF
+
+      - name: Start SQL Server
+        run: make db-up
+
+      - name: Create Referensdata + azuredl schemas
+        run: make db-init
+
+      - name: dbt deps
+        run: dbt deps
+
+      - name: "dbt seed (target=nightly threads=${{ matrix.threads }})"
+        run: "dbt seed --target nightly"
+
+      - name: "dbt run (target=nightly threads=${{ matrix.threads }})"
+        run: "dbt run --target nightly"
+
+      - name: "dbt test (target=nightly threads=${{ matrix.threads }})"
+        # Don't stop the workflow on test failure: the *outcome* (does
+        # the suite complete cleanly at this concurrency level, or
+        # segfault, or fail individual tests?) is the data we're after.
+        continue-on-error: true
+        run: "dbt test --target nightly"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Threads=${{ matrix.threads }} -- ${{ github.event.inputs.ref_note }}"
+            echo
+            echo "- Upstream repo: \`$UPSTREAM_REPO\`"
+            echo "- Run-id: [$UPSTREAM_RUN_ID](https://github.com/$UPSTREAM_REPO/actions/runs/$UPSTREAM_RUN_ID)"
+            echo "- duckdb pip version: $(python -c 'import duckdb; print(duckdb.__version__)')"
+            echo "- dbt build status: see \`dbt run\` step above"
+            echo "- dbt test result: see \`dbt test\` step above (continue-on-error)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dump SQL Server logs on failure
+        if: failure()
+        run: docker compose logs mssql --no-color --tail 200
+
+      - name: Tear down
+        if: always()
+        run: make db-down || true
