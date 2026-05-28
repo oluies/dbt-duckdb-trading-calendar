@@ -41,3 +41,41 @@ holiday_loader:
         - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
           type: mssql
           alias: Referensdata
+
+    # Nightly stress-test target. Used only by the
+    # duckdb-mssql-nightly.yml workflow, which pre-places a freshly
+    # built `mssql.duckdb_extension` (from upstream
+    # hugr-lab/mssql-extension CI artifacts) into DuckDB's extension
+    # cache and then runs the full pipeline at threads=4 or 8.
+    #
+    # Differences vs `dev`:
+    #   * threads is env-driven (DBT_THREADS=4 or 8). Default 4 so a
+    #     stray `--target nightly` without env doesn't accidentally
+    #     fall back to threads=1.
+    #   * The mssql `extensions:` entry has no `repo:` -- dbt-duckdb
+    #     emits plain `INSTALL mssql; LOAD mssql`, which is a no-op
+    #     when the binary is already in the cache. If we kept
+    #     `repo: community` here the install would clobber our
+    #     pre-placed nightly binary with the released community build.
+    #   * `allow_unsigned_extensions: true` -- upstream CI builds are
+    #     not code-signed.
+    nightly:
+      type: duckdb
+      path: 'holiday_loader.duckdb'
+      threads: "{{ env_var('DBT_THREADS', '4') | int }}"
+      extensions:
+        - httpfs
+        - azure
+        - name: mssql
+      secrets:
+        - type: azure
+          provider: config
+          account_name: azureopendatastorage
+      settings:
+        azure_transport_option_type: 'curl'
+        ca_cert_file: "{{ env_var('AZURE_CA_CERT_FILE', '/etc/ssl/certs/ca-certificates.crt') }}"
+        allow_unsigned_extensions: true
+      attach:
+        - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
+          type: mssql
+          alias: Referensdata
