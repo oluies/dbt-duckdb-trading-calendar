@@ -139,7 +139,30 @@ Normalized, Kimball-style. **No** wide per-country boolean columns on
   from `dbt_utils.date_spine`.
 - **`dim_date`** – country-agnostic, one row per day. `iso_day_of_week`
   uses DuckDB's `isodow()`, which always returns 1=Monday..7=Sunday and
-  does NOT depend on any `SET DATEFIRST` / locale setting.
+  does NOT depend on any `SET DATEFIRST` / locale setting. ISO 8601
+  week semantics are completed by `iso_week_number`, `iso_year`, and
+  the text key `iso_year_week` ('2026-W01').
+
+  Includes **ML feature columns** alongside the standard dim columns:
+
+  - cycle-position booleans: `is_month_start`, `is_month_end`,
+    `is_quarter_start`, `is_quarter_end`, `is_year_start`, `is_year_end`,
+    plus `week_of_month` (1..5).
+  - distance integers: `days_since_year_start`, `days_to_year_end`
+    (both 0 on their boundary day).
+  - cyclical encodings: `dow_sin/cos`, `month_sin/cos`, `doy_sin/cos`.
+    Each `(sin, cos)` pair maps an ordinal onto the unit circle so the
+    first and last value of the cycle sit adjacent (Sun -> Mon = 1 step,
+    Dec -> Jan = 1 step) instead of being maximally apart. Useful for
+    linear models, and as input features for tree models that don't
+    natively model cycles. Day-of-year uses period 365.25 to average
+    across the leap cycle. See scikit-learn's [Time-related feature
+    engineering](https://scikit-learn.org/stable/auto_examples/applications/plot_cyclical_feature_engineering.html)
+    example for the canonical pattern.
+
+  We deliberately do NOT one-hot day_name / month_name / quarter into
+  the dim -- modern ML frameworks accept integers, and one-hot at the
+  warehouse layer couples the schema to a specific feature pipeline.
 - **`dim_country`** – seeded from `seeds/dim_country.csv`. One row per
   country in `var('holiday_country_codes')`.
 - **`fct_holiday_calendar`** – grain `(holiday_date, country_code)`.

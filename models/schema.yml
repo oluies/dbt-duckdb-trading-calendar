@@ -37,6 +37,57 @@ models:
           - accepted_values:
               values: [1, 2, 3, 4, 5, 6, 7]
               quote: false
+      - name: iso_week_number
+        description: ISO 8601 week number 1..53.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 1 and iso_week_number <= 53"
+      - name: iso_year
+        description: ISO 8601 week-year. Differs from year_number around year boundaries (e.g. 2025-12-29 -> iso_year=2026).
+        tests:
+          - not_null
+      - name: iso_year_week
+        description: ISO 8601 year-week text key like '2026-W01'.
+        tests:
+          - not_null
+      - name: week_of_month
+        description: 1..5 within the calendar month (ceil(day_of_month/7)).
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+              quote: false
+      - name: is_month_start
+        tests:
+          - not_null
+      - name: is_month_end
+        tests:
+          - not_null
+      - name: is_quarter_start
+        tests:
+          - not_null
+      - name: is_quarter_end
+        tests:
+          - not_null
+      - name: is_year_start
+        tests:
+          - not_null
+      - name: is_year_end
+        tests:
+          - not_null
+      - name: days_since_year_start
+        description: Zero on Jan 1; ML distance feature.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0 and days_since_year_start <= 365"
+      - name: days_to_year_end
+        description: Zero on Dec 31; ML distance feature.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0 and days_to_year_end <= 365"
 
   - name: fct_holiday_calendar
     description: >
