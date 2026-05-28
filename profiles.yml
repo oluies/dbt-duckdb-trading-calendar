@@ -119,11 +119,19 @@ holiday_loader:
 # `main_elementary`; see dbt_project.yml), so edr reads native DuckDB tables.
 # It must NOT attach SQL Server: edr's read queries against the attached
 # server segfault the community mssql extension (exit 139).
+#
+# path is ABSOLUTE on purpose. `edr report` runs with --project-dir pointing
+# at elementary's bundled dbt project (under site-packages), and dbt-duckdb
+# resolves a relative `path` against the project dir -- so a relative
+# 'holiday_loader.duckdb' would open a fresh EMPTY file there instead of the
+# one the main `dbt run` wrote (Catalog Error: schema main_elementary does not
+# exist). GITHUB_WORKSPACE is the Actions checkout root (where the main run's
+# cwd-relative file lands); locally it falls back to the current directory.
 elementary:
   target: dev
   outputs:
     dev:
       type: duckdb
-      path: 'holiday_loader.duckdb'
+      path: "{{ env_var('GITHUB_WORKSPACE', '.') }}/holiday_loader.duckdb"
       threads: 1
       schema: main_elementary
