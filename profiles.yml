@@ -90,3 +90,48 @@ holiday_loader:
         - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
           type: mssql
           alias: Referensdata
+
+# ---------------------------------------------------------------------------
+# Elementary CLI (`edr report`) profile.
+#
+# `edr report` runs Elementary's OWN bundled dbt project, which hardcodes
+# `profile: elementary`. With only the `holiday_loader` profile present the
+# CLI fails with `Could not find profile named 'elementary'` and no report is
+# produced (the dbt pipeline itself is unaffected -- only report generation).
+#
+# This profile reuses the dev DuckDB connection and points at the schema the
+# elementary models were materialised into: target schema `main` composed with
+# `+schema: elementary` (dbt_project.yml) => `main_elementary`, inside the
+# attached `Referensdata` SQL Server. `database`/`schema` are set explicitly so
+# edr's read queries resolve to `Referensdata.main_elementary.<table>`.
+#
+# threads: 1 for the same reason as dev -- the community mssql extension is not
+# safe under concurrent reads against the attached SQL Server.
+# ---------------------------------------------------------------------------
+# Elementary CLI (`edr report`) profile.
+#
+# `edr report` runs Elementary's OWN bundled dbt project, which hardcodes
+# `profile: elementary`. Without this block edr fails with
+# `Could not find profile named 'elementary'`.
+#
+# This is a PURE LOCAL DuckDB connection -- no attach, no mssql extension.
+# The elementary models are materialised into the DuckDB file (schema
+# `main_elementary`; see dbt_project.yml), so edr reads native DuckDB tables.
+# It must NOT attach SQL Server: edr's read queries against the attached
+# server segfault the community mssql extension (exit 139).
+#
+# path is ABSOLUTE on purpose. `edr report` runs with --project-dir pointing
+# at elementary's bundled dbt project (under site-packages), and dbt-duckdb
+# resolves a relative `path` against the project dir -- so a relative
+# 'holiday_loader.duckdb' would open a fresh EMPTY file there instead of the
+# one the main `dbt run` wrote (Catalog Error: schema main_elementary does not
+# exist). GITHUB_WORKSPACE is the Actions checkout root (where the main run's
+# cwd-relative file lands); locally it falls back to the current directory.
+elementary:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "{{ env_var('GITHUB_WORKSPACE', '.') }}/holiday_loader.duckdb"
+      threads: 1
+      schema: main_elementary
