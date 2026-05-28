@@ -91,22 +91,27 @@ jobs:
         run: dbt deps
 
       - name: dbt seed (with elementary)
-        run: dbt seed --vars '{with_elementary: true}'
+        # NB: keep the `run:` value double-quoted -- the embedded
+        # `: true` inside the dbt --vars JSON would otherwise be
+        # scanned as a YAML mapping value and trip strict parsers
+        # (dependabot in particular). GitHub Actions' parser is
+        # lenient enough to run it either way.
+        run: "dbt seed --vars '{with_elementary: true}'"
 
       - name: dbt run (project + elementary)
-        run: dbt run --vars '{with_elementary: true}'
+        run: "dbt run --vars '{with_elementary: true}'"
 
       - name: dbt test
         # continue-on-error so the report below is generated even when
         # a project test fails -- that's when the report is most useful.
         continue-on-error: true
-        run: dbt test --vars '{with_elementary: true}'
+        run: "dbt test --vars '{with_elementary: true}'"
 
       - name: dbt run (re-ingest elementary)
         # Second pass over the elementary package only, so its
         # incremental models pick up the run+test artifacts that the
         # preceding steps just wrote to target/.
-        run: dbt run --select package:elementary --vars '{with_elementary: true}'
+        run: "dbt run --select package:elementary --vars '{with_elementary: true}'"
 
       - name: Generate Elementary HTML report
         run: |
