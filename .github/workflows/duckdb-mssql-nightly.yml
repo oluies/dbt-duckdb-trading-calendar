@@ -144,6 +144,32 @@ jobs:
       - name: dbt deps
         run: dbt deps
 
+      - name: Verify extension origin
+        # Force-installs from community (same path dbt-duckdb takes
+        # when it processes the nightly profile), then queries
+        # duckdb_extensions() to report which binary is actually loaded.
+        # If install_path points at our pre-placed file under
+        # ~/.duckdb/extensions/..., the cache won. If it points at the
+        # community CDN we know INSTALL clobbered us and the run is
+        # really testing the released community version.
+        run: |
+          python3 <<'PY'
+          import duckdb, json
+          con = duckdb.connect(':memory:')
+          con.execute("SET allow_unsigned_extensions=true")
+          con.execute("INSTALL mssql FROM community")
+          con.execute("LOAD mssql")
+          rows = con.execute("""
+              SELECT extension_name, loaded, installed, install_path,
+                     extension_version, install_mode
+              FROM duckdb_extensions() WHERE extension_name = 'mssql'
+          """).fetchall()
+          for r in rows:
+              print(json.dumps(dict(zip(
+                  ['name','loaded','installed','install_path',
+                   'version','install_mode'], r)), indent=2, default=str))
+          PY
+
       - name: "dbt seed (target=nightly threads=${{ matrix.threads }})"
         run: "dbt seed --target nightly"
 

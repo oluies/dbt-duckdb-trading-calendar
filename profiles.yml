@@ -52,13 +52,23 @@ holiday_loader:
     #   * threads is env-driven (DBT_THREADS=4 or 8). Default 4 so a
     #     stray `--target nightly` without env doesn't accidentally
     #     fall back to threads=1.
-    #   * The mssql `extensions:` entry has no `repo:` -- dbt-duckdb
-    #     emits plain `INSTALL mssql; LOAD mssql`, which is a no-op
-    #     when the binary is already in the cache. If we kept
-    #     `repo: community` here the install would clobber our
-    #     pre-placed nightly binary with the released community build.
     #   * `allow_unsigned_extensions: true` -- upstream CI builds are
     #     not code-signed.
+    #
+    # mssql still uses `repo: community` because dbt-duckdb 1.10 made
+    # `repo` a required positional argument on its Extension dataclass
+    # (dbt/adapters/duckdb/credentials.py): `- name: mssql` alone raises
+    # `Extension.__init__() missing 1 required positional argument: 'repo'`
+    # at config-parse time, and the install path is hardcoded as
+    # `INSTALL <name> FROM <repo>` with no local-file alternative.
+    #
+    # Whether the pre-placed binary survives the workflow's INSTALL FROM
+    # community step depends on DuckDB's cache behaviour, so the workflow
+    # has a "Verify extension origin" step that prints the loaded
+    # extension's install_path + version via `duckdb_extensions()`. If
+    # it points at the upstream artifact we know the pre-placement won;
+    # if it points at the community CDN, INSTALL clobbered our binary
+    # and we're back to testing the released version.
     nightly:
       type: duckdb
       path: 'holiday_loader.duckdb'
@@ -67,6 +77,7 @@ holiday_loader:
         - httpfs
         - azure
         - name: mssql
+          repo: community
       secrets:
         - type: azure
           provider: config
