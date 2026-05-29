@@ -108,7 +108,7 @@ jobs:
         # Second pass over the elementary package only, so its
         # incremental models pick up the run+test artifacts that the
         # preceding steps just wrote to target/.
-        run: "dbt run --select package:elementary --vars '{with_elementary: true}'"
+        run: "dbt run --select package:elementary --target dev_noattach --vars '{with_elementary: true}'"
 
       - name: Generate Elementary HTML report
         run: |
