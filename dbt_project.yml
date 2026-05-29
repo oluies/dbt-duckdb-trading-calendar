@@ -62,13 +62,19 @@ models:
   # +schema: elementary composes with target.schema (dbt-duckdb default
   # 'main') into the actual schema name `main_elementary`.
   #
-  # +materialized: table overrides elementary's default incremental
-  # materialization -- we lose run-history accumulation, but the CI's
-  # DuckDB file is recreated each run so there's no history to keep.
+  # NB: do NOT override +materialized here. Elementary's result tables
+  # (elementary_test_results, dbt_run_results, ...) are INCREMENTAL: the
+  # on-run-end hook appends each invocation's results, and the workflow's
+  # second `dbt run --select package:elementary` pass ingests them. Forcing
+  # +materialized: table makes that second pass `create or replace table`
+  # the result tables empty, wiping the hook-stored test/run results -- the
+  # report then shows model + test *definitions* but zero results.
+  # (The table override once dodged an mssql ATTACH auto-commit error on
+  # incremental MERGE; that path is gone now elementary lives in local
+  # DuckDB, where incremental works normally.)
   elementary:
     +enabled: "{{ var('with_elementary', false) }}"
     +schema: elementary
-    +materialized: table
 
 seeds:
   holiday_loader:

@@ -42,6 +42,20 @@ holiday_loader:
           type: mssql
           alias: Referensdata
 
+    # No-attach DuckDB target, used ONLY by the elementary re-ingest step
+    # in .github/workflows/elementary.yml. Elementary's on-run-end hook
+    # captures run/test results into its tables, but when the connection also
+    # holds the community mssql ATTACH those native-DuckDB writes are left in
+    # an uncommitted transaction that is discarded on close (no error) -- so
+    # the elementary tables end up empty and the report shows definitions but
+    # zero results. Running the ingest pass WITHOUT the attach restores normal
+    # autocommit so the results persist. Same DuckDB file/schema as dev, so it
+    # sees and appends to the elementary tables dev already built.
+    dev_noattach:
+      type: duckdb
+      path: 'holiday_loader.duckdb'
+      threads: 1
+
     # Nightly stress-test target. Used only by the
     # duckdb-mssql-nightly.yml workflow, which pre-places a freshly
     # built `mssql.duckdb_extension` (from upstream
