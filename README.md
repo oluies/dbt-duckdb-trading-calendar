@@ -91,6 +91,40 @@ make db-up && make db-init && \
 
 (prefix the `make` commands with `PLATFORM=arm-mac` on Apple Silicon).
 
+### 5. Browse the marts (optional)
+
+To explore the resulting tables in `Referensdata.azuredl` with a web SQL
+client + table browser, use the opt-in **DBGate** service (open source, MIT).
+
+**One command** (starts SQL Server, builds the marts into a local `.venv`,
+launches DBGate, opens the browser, then prints the tables). It picks the
+DB image by CPU architecture -- native arm64 Azure SQL Edge on Apple
+Silicon, SQL Server on amd64:
+
+```bash
+scripts/view-marts.sh          # macOS / Linux
+scripts\view-marts.ps1         # Windows (PowerShell)
+
+scripts/view-marts.sh down     # tear it all down (down also works on .ps1)
+```
+
+**Or wire it up by hand** with the Makefile (assumes you have already run
+`dbt seed`/`dbt run`):
+
+```bash
+make db-up        # if SQL Server isn't already running
+make db-viewer    # starts DBGate, opt-in compose profile "tools"
+# open http://localhost:8085  -- auto-connected as "Referensdata"
+make db-viewer-down   # stop + remove the viewer when done
+```
+
+DBGate runs alongside SQL Server in docker-compose (it is **not** started
+by `make db-up`). It auto-connects to the `mssql` service; `USE_SSL` +
+`SSL_TRUST_CERTIFICATE` mirror the dbt profile's
+`Encrypt=yes;TrustServerCertificate=yes` so it trusts SQL Server's
+self-signed dev certificate. It opens focused on `Referensdata`; you can
+run ad-hoc SQL or click through `azuredl.*` tables.
+
 ---
 
 ## Data model

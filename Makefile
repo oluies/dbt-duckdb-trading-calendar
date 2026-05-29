@@ -30,7 +30,7 @@ endif
 COMPOSE := docker compose -f $(COMPOSE_FILE)
 SERVICE := mssql
 
-.PHONY: help db-up db-down db-shell db-init db-logs db-status
+.PHONY: help db-up db-down db-shell db-init db-logs db-status db-viewer db-viewer-down
 
 help:
 	@echo "Targets (set PLATFORM=arm-mac on Apple Silicon for native arm64):"
@@ -40,6 +40,8 @@ help:
 	@echo "  db-init    Create Referensdata database and azuredl schema"
 	@echo "  db-logs    Tail SQL Server logs"
 	@echo "  db-status  Show container + healthcheck status"
+	@echo "  db-viewer  Start DBGate web SQL browser at http://localhost:8085"
+	@echo "  db-viewer-down  Stop and remove the DBGate viewer"
 	@echo ""
 	@echo "Current PLATFORM=$(PLATFORM) -> $(COMPOSE_FILE)"
 
@@ -74,3 +76,15 @@ db-logs:
 
 db-status:
 	$(COMPOSE) ps $(SERVICE)
+
+# DBGate web SQL client / table browser for the marts. Opt-in via the
+# compose "tools" profile so it never starts with a normal db-up. It
+# auto-connects to the mssql service (connection "Referensdata").
+db-viewer:
+	@test -n "$$SA_PASSWORD" || (echo "SA_PASSWORD not set. Copy .env.example to .env first." && exit 1)
+	$(COMPOSE) --profile tools up -d dbviewer
+	@echo "DBGate starting at http://localhost:8085 (connection: Referensdata)."
+	@echo "If SQL Server isn't running yet, run 'make db-up' first (or 'make PLATFORM=arm-mac db-up')."
+
+db-viewer-down:
+	$(COMPOSE) --profile tools rm -sf dbviewer
