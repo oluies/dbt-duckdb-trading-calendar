@@ -58,22 +58,31 @@ models:
           - accepted_values:
               values: [1, 2, 3, 4, 5]
               quote: false
+      # Cycle-position flags -- the start/end boundary of each calendar
+      # cycle. Genuine signals (billing, reporting, settlement effects),
+      # not redundant expansions of the integer columns.
       - name: is_month_start
+        description: True on the first calendar day of the month.
         tests:
           - not_null
       - name: is_month_end
+        description: True on the last calendar day of the month.
         tests:
           - not_null
       - name: is_quarter_start
+        description: True on the first calendar day of the quarter (Jan/Apr/Jul/Oct 1).
         tests:
           - not_null
       - name: is_quarter_end
+        description: True on the last calendar day of the quarter.
         tests:
           - not_null
       - name: is_year_start
+        description: True on Jan 1.
         tests:
           - not_null
       - name: is_year_end
+        description: True on Dec 31.
         tests:
           - not_null
       - name: days_since_year_start
@@ -88,6 +97,59 @@ models:
           - not_null
           - dbt_utils.expression_is_true:
               expression: ">= 0 and days_to_year_end <= 365"
+
+      # Cyclical encodings -- each (sin, cos) PAIR maps an ordinal onto the
+      # unit circle at angle 2*pi*(n-1)/period, so cycle-adjacent values are
+      # adjacent in feature space (Dec->Jan, Sun->Mon = 1 step). Always use
+      # BOTH columns of a pair: a lone sin is ambiguous (two phases share a
+      # value); the pair is unique. Recover the ordinal with atan2(sin, cos);
+      # cyclic similarity between two rows is the dot product of their pairs.
+      # See README "Using the cyclical encodings" and dim_date.sql.
+      - name: dow_sin
+        description: >
+          Sine of the day-of-week cyclical encoding (iso_day_of_week 1..7,
+          period 7). Pair with dow_cos. Monday is angle 0 (dow_sin=0,
+          dow_cos=1). Range [-1, 1]. For ML/cyclic-distance use, not direct
+          human reading.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= -1 and dow_sin <= 1"
+      - name: dow_cos
+        description: Cosine of the day-of-week encoding (period 7). Pair with dow_sin. Range [-1, 1].
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= -1 and dow_cos <= 1"
+      - name: month_sin
+        description: >
+          Sine of the month-of-year cyclical encoding (month_number 1..12,
+          period 12). Pair with month_cos. January is angle 0. Range [-1, 1].
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= -1 and month_sin <= 1"
+      - name: month_cos
+        description: Cosine of the month-of-year encoding (period 12). Pair with month_sin. Range [-1, 1].
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= -1 and month_cos <= 1"
+      - name: doy_sin
+        description: >
+          Sine of the day-of-year cyclical encoding (day_of_year 1..366,
+          period 365.25 to average across the leap cycle). Pair with doy_cos.
+          Range [-1, 1].
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= -1 and doy_sin <= 1"
+      - name: doy_cos
+        description: Cosine of the day-of-year encoding (period 365.25). Pair with doy_sin. Range [-1, 1].
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= -1 and doy_cos <= 1"
 
   - name: fct_holiday_calendar
     description: >

@@ -246,6 +246,53 @@ erDiagram
 The seed is pre-populated with **Nasdaq Stockholm (XSTO)** exception
 days for 2024–2026 as a worked example.
 
+### Using the cyclical encodings
+
+The `(sin, cos)` pairs (`dow_sin/cos`, `month_sin/cos`, `doy_sin/cos`) place
+each ordinal on the unit circle at angle `2*pi*(n-1)/period`, so cycle-adjacent
+values are adjacent in feature space (Sun→Mon, Dec→Jan = one step). **Always
+use both columns of a pair** — a lone `sin` is ambiguous (two phases share a
+value); the pair is unique, like `(x, y)` on the circle.
+
+**For ML** they give a model a smooth, wrap-aware view of calendar phase:
+
+- Linear / logistic / GLM and neural nets can't express "December is next to
+  January" from a raw `month_number`; the pair turns it into a smooth periodic
+  signal. Add harmonics (`sin`/`cos` of 2×, 3× the angle) for richer seasonal
+  shape.
+- Distance / kernel models (kNN, k-means, RBF-SVM) get a Euclidean distance on
+  the pair that respects cyclic proximity.
+- Tree ensembles (RandomForest, XGBoost, LightGBM) can already split the raw
+  integers, so the encodings are optional there — harmless, sometimes a small
+  help. This is why the dim keeps **both** the raw ordinals and the encodings.
+
+**For SQL / human analysis** a raw `0.43` isn't human-readable — for eyeballing
+use `day_of_week` / `month_number` / the `is_*` flags. The pair is for cyclic
+math:
+
+```sql
+-- phase angle in radians for the weekly cycle (0 = Monday)
+atan2(dow_sin, dow_cos)                          AS dow_angle
+
+-- cyclic similarity between two rows' weekly phase: the dot product of the
+-- unit vectors -> 1 = same phase, 0 = a quarter-cycle apart, -1 = opposite
+a.dow_sin * b.dow_sin + a.dow_cos * b.dow_cos    AS phase_cos_sim
+```
+
+They are **feature columns, not window-frame keys**: window functions still
+`ORDER BY date_day`. The encodings feed seasonal features *inside* those windows
+(rolling models, lagged features); they don't define the frame bounds.
+
+**For changepoint detection (PELT and friends)** detectors like PELT (e.g.
+Python [`ruptures`](https://centre-borelli.github.io/ruptures-docs/)), Binary
+Segmentation, or Bayesian online changepoint detection find where a series'
+statistics shift. Run naively on a seasonal metric they fire on the season
+itself (every December). Use the cyclical features to remove that: regress your
+metric on them (plus harmonics) and run the detector on the **residual** to
+surface genuine regime changes; or pass them as covariates to a multivariate
+detector so the expected seasonal mean-shift isn't flagged. The encodings model
+seasonality cleanly — they are not changepoints themselves.
+
 ### Why normalized?
 
 - **Scales to N countries with no schema change.** Wide per-country
