@@ -145,6 +145,7 @@ erDiagram
         int iso_week_number "1..53"
         int iso_year "ISO week-based year"
         varchar iso_year_week "e.g. 2026-W01"
+        int us_week_number "US %U Sun-start, 0..53"
         varchar month_name
         varchar day_name
         int iso_day_of_week "1=Mon..7=Sun"
@@ -210,7 +211,12 @@ erDiagram
   uses DuckDB's `isodow()`, which always returns 1=Monday..7=Sunday and
   does NOT depend on any `SET DATEFIRST` / locale setting. ISO 8601
   week semantics are completed by `iso_week_number`, `iso_year`, and
-  the text key `iso_year_week` ('2026-W01').
+  the text key `iso_year_week` ('2026-W01'). ISO 8601 is the convention
+  for Sweden/EU and trading use; `us_week_number` additionally carries
+  the US/Sunday-start convention (`strftime %U`, range 0..53, where days
+  before the first Sunday of the year fall in week 0). Unlike ISO, US
+  weeks never cross the year boundary, so `year_number` is the matching
+  week-year and there is no separate US week-year column.
 
   Includes **ML feature columns** alongside the standard dim columns:
 
@@ -318,7 +324,10 @@ seasonality cleanly — they are not changepoints themselves.
 `models/schema.yml` covers:
 
 - `dim_date` – unique + not_null on `date_key`, `date_day`;
-  `iso_day_of_week` in 1..7
+  `iso_day_of_week` in 1..7; `us_week_number` in 0..53. A singular test
+  (`tests/assert_dim_date_week_numbers.sql`) also pins the ISO and US
+  week columns to hand-verified values for well-known edge-case dates
+  in `seeds/expected_week_numbers.csv`.
 - `dim_country` – unique + not_null on `country_code`;
   `accepted_values` matching `var('holiday_country_codes')`
 - `fct_holiday_calendar` – not_null on `date_key`, `country_code`,
