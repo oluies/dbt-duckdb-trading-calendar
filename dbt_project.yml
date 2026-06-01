@@ -85,6 +85,16 @@ seeds:
         exchange_name: varchar(100)
         country_code: varchar(2)
         holiday_name: varchar(200)
+    # Frozen reference values for the dim_date week-number regression
+    # test (tests/assert_dim_date_week_numbers.sql).
+    expected_week_numbers:
+      +column_types:
+        date_day: date
+        iso_week_number: integer
+        iso_year: integer
+        iso_year_week: varchar(8)
+        us_week_number: integer
+        note: varchar(100)
   elementary:
     +enabled: "{{ var('with_elementary', false) }}"
     +database: Referensdata

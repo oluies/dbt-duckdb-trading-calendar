@@ -1,0 +1,11 @@
+date_day,iso_week_number,iso_year,iso_year_week,us_week_number,note
+2016-01-01,53,2015,2015-W53,0,Fri - ISO 2015 was a 53-week year
+2021-01-01,53,2020,2020-W53,0,Fri - ISO 2020 was a 53-week year
+2023-01-01,52,2022,2022-W52,1,Sun - belongs to ISO 2022-W52 not 2023
+2023-12-31,52,2023,2023-W52,53,Sun - US Sunday-start week 53
+2024-01-07,1,2024,2024-W01,1,first Sunday of 2024 - US week 1
+2024-12-31,1,2025,2025-W01,52,Tue - rolls into ISO 2025-W01
+2025-12-29,1,2026,2026-W01,52,Mon - first day of ISO 2026-W01
+2026-01-01,1,2026,2026-W01,0,Thu New Year - US week 0 (before first Sunday)
+2026-01-05,2,2026,2026-W02,1,Mon - starts ISO 2026-W02
+2026-08-03,32,2026,2026-W32,31,Swedish summer vecka 32

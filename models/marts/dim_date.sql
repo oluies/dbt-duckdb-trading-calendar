@@ -9,6 +9,14 @@
 -- SET DATEFIRST / locale setting. iso_year + iso_year_week follow
 -- ISO 8601 too: 2025-12-29 -> iso_year=2026, iso_year_week='2026-W01'.
 --
+-- ISO 8601 is the week convention for Sweden, the EU and most
+-- trading use. us_week_number carries the US/Sunday-start
+-- convention (strftime %U) for consumers that need it: weeks start
+-- Sunday and days before the first Sunday of the year fall in
+-- "week 0", so its range is 0..53. Unlike ISO, US weeks never
+-- cross the year boundary (2023-12-31 -> week 53 of 2023), so there
+-- is no separate US week-year column; year_number already holds it.
+--
 -- ML feature columns (cycle-position booleans, distance ints,
 -- sin/cos cyclical encodings) live alongside the standard dim
 -- columns so feature-engineering pipelines can read straight from
@@ -27,6 +35,7 @@ with base as (
         cast(extract(week     from date_day) as integer)              as iso_week_number,
         cast(extract(isoyear  from date_day) as integer)              as iso_year,
         strftime(date_day, '%G-W%V')                                  as iso_year_week,
+        cast(strftime(date_day, '%U') as integer)                     as us_week_number,
         strftime(date_day, '%B')                                      as month_name,
         strftime(date_day, '%A')                                      as day_name,
         cast(isodow(date_day) as integer)                             as iso_day_of_week,
@@ -53,6 +62,7 @@ select
     iso_week_number,
     iso_year,
     iso_year_week,
+    us_week_number,
     month_name,
     day_name,
     iso_day_of_week,
