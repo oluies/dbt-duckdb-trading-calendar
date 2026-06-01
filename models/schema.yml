@@ -51,6 +51,16 @@ models:
         description: ISO 8601 year-week text key like '2026-W01'.
         tests:
           - not_null
+      - name: us_week_number
+        description: >
+          US/Sunday-start week number (strftime %U), 0..53. Weeks start
+          Sunday; days before the first Sunday of the year are week 0.
+          Unlike ISO, US weeks do not cross the year boundary, so the
+          calendar year_number is the matching week-year.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0 and us_week_number <= 53"
       - name: week_of_month
         description: 1..5 within the calendar month (ceil(day_of_month/7)).
         tests:
