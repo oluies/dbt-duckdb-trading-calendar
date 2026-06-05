@@ -4,13 +4,24 @@ holiday_loader:
     dev:
       type: duckdb
       path: 'holiday_loader.duckdb'
-      # Multi-threaded as of mssql extension v0.2.1, which makes
-      # concurrent reads against an attached SQL Server thread-safe
-      # (hugr-lab/mssql-extension PR #127, "Thread-safe catalog entry
-      # lifetime"). Earlier versions segfaulted the worker mid `dbt test`
-      # at threads >= 2 (exit 139, leaked semaphores), so this was pinned
-      # to 1. If a regression resurfaces, drop back to threads: 1.
-      threads: 4
+      # Single-threaded. The DuckDB community `mssql` extension segfaults
+      # the worker (exit 139, core dumped) INTERMITTENTLY under concurrent
+      # access against an attached SQL Server: at threads=4 it crashed
+      # `dbt seed` (3 concurrent seeds) on main run 27032382694 yet passed
+      # once on the same commit's PR (2026-06-05).
+      #
+      # The thread-safety fix (hugr-lab/mssql-extension PR #127, "Thread-
+      # safe catalog entry lifetime") is in the v0.2.1 release (commit
+      # 3c100e9, 2026-06-05) -- but `INSTALL mssql FROM community` still
+      # resolves to v0.2.0 (commit da0204c, 2026-05-20), which PREDATES
+      # the fix. The community-extensions CDN had not published v0.2.1
+      # yet, so CI was never actually running the fixed build. Verify the
+      # installed build with:
+      #   SELECT extension_version FROM duckdb_extensions()
+      #   WHERE extension_name='mssql';   -- commit hash, not the tag
+      # Bump back to threads: 4 once that hash is 3c100e9 (v0.2.1) or
+      # later AND the nightly stress workflow stays green at threads=4/8.
+      threads: 1
       extensions:
         - httpfs
         - azure
