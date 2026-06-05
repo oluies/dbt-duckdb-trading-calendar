@@ -4,19 +4,13 @@ holiday_loader:
     dev:
       type: duckdb
       path: 'holiday_loader.duckdb'
-      # Single-threaded. The DuckDB community `mssql` extension is not
-      # safe under concurrent reads against an attached SQL Server --
-      # `dbt test` with threads >= 2 segfaults the worker process
-      # mid-suite (exit 139, leaked semaphores). One thread takes a
-      # little longer but completes deterministically.
-      #
-      # Fix tracking: https://github.com/hugr-lab/mssql-extension/pull/127
-      #   ("Thread-safe catalog entry lifetime") -- addresses the exact
-      #   use-after-free in concurrent catalog loads that produces the
-      #   segfault. Once that PR ships in a tagged release, bump this to
-      #   `threads: 4`, run the full CI matrix, and remove this comment
-      #   block if `dbt test` is stable.
-      threads: 1
+      # Multi-threaded as of mssql extension v0.2.1, which makes
+      # concurrent reads against an attached SQL Server thread-safe
+      # (hugr-lab/mssql-extension PR #127, "Thread-safe catalog entry
+      # lifetime"). Earlier versions segfaulted the worker mid `dbt test`
+      # at threads >= 2 (exit 139, leaked semaphores), so this was pinned
+      # to 1. If a regression resurfaces, drop back to threads: 1.
+      threads: 4
       extensions:
         - httpfs
         - azure
