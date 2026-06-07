@@ -4,8 +4,10 @@
 [![Elementary report](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml)
 [![dbt-core](https://img.shields.io/badge/dbt--core-1.11.11-FF694B?logo=dbt&logoColor=white)](https://github.com/dbt-labs/dbt-core)
 [![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.10.1-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb)
-[![DuckDB](https://img.shields.io/badge/DuckDB-engine-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org)
-[![DuckDB mssql extension](https://img.shields.io/badge/DuckDB%20mssql%20ext-community-blue?logo=microsoftsqlserver&logoColor=white)](https://github.com/hugr-lab/mssql-extension)
+[![DuckDB](https://img.shields.io/badge/DuckDB-v1.5.3-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org)
+[![ext: httpfs](https://img.shields.io/badge/ext%3A%20httpfs-core-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/httpfs/overview)
+[![ext: azure](https://img.shields.io/badge/ext%3A%20azure-core-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/azure)
+[![ext: mssql](https://img.shields.io/badge/ext%3A%20mssql-community%20v0.2.0-blue?logo=microsoftsqlserver&logoColor=white)](https://github.com/hugr-lab/mssql-extension)
 
 A dbt project that builds a **date dimension** plus a **normalized,
 Kimball-style holiday and exchange calendar** in SQL Server 2022,
@@ -15,6 +17,36 @@ DuckDB reads the public Azure Open Datasets _Public Holidays_ Parquet
 directly from blob storage and writes the resulting tables into a
 SQL Server database (`Referensdata.azuredl`) over the DuckDB **mssql**
 extension's `ATTACH`.
+
+### DuckDB extensions
+
+The badges above track the three extensions this project loads (see
+`profiles.yml`):
+
+| Extension | Repo | Role |
+| --- | --- | --- |
+| [`httpfs`](https://duckdb.org/docs/stable/core_extensions/httpfs/overview) | core | reads the remote Parquet over HTTPS |
+| [`azure`](https://duckdb.org/docs/stable/core_extensions/azure) | core | Azure blob storage access for the Open Datasets feed |
+| [`mssql`](https://github.com/hugr-lab/mssql-extension) | community | `ATTACH`es SQL Server so dbt writes the marts there |
+
+The badge versions are pinned to known-good values; the **live**
+versions installed for your DuckDB build are reported by `UPDATE
+EXTENSIONS;` (or `duckdb_extensions()`). Note these are **commit
+hashes**, not release tags — e.g. `mssql` `da0204c` is release v0.2.0:
+
+```sql
+INSTALL mssql FROM community; LOAD mssql;
+UPDATE EXTENSIONS;            -- name, repo, update_result, prev/current version
+-- or, for install path + load state:
+SELECT extension_name, extension_version, installed, loaded
+FROM duckdb_extensions()
+WHERE extension_name IN ('httpfs', 'azure', 'mssql');
+```
+
+> The `mssql` extension is still pinned single-threaded in
+> `profiles.yml` (`threads: 1`); the thread-safety fix lands in v0.2.1
+> once it reaches the DuckDB community repo. See the `threads` comment
+> in `profiles.yml`.
 
 ---
 
