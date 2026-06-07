@@ -1,0 +1,62 @@
+name: Update badges
+
+# Keeps the README badge table (between the BADGES markers) in sync with
+# reality: DuckDB engine version, the dbt-core / dbt-duckdb pins, and the
+# live extension commit hashes from duckdb_extensions(). Runs when a pin
+# could change (push touching requirements.txt / the generator) and on a
+# weekly schedule to catch upstream extension-build updates that happen
+# without a commit here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - requirements.txt
+      - scripts/update_extension_badges.py
+      - .github/workflows/badges.yml
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-badges
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # Install the SAME stack as CI so the engine version and extension
+      # hashes match what `dbt build` actually runs against.
+      - name: Install dbt + duckdb
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Regenerate badge table
+        run: python scripts/update_extension_badges.py
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- README.md; then
+            echo "No badge changes."
+            exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          # [skip ci] so the auto-commit does not retrigger any workflow.
+          git commit -m "chore: refresh README badge versions [skip ci]"
+          git push
