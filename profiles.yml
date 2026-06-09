@@ -4,24 +4,22 @@ holiday_loader:
     dev:
       type: duckdb
       path: 'holiday_loader.duckdb'
-      # Single-threaded. The DuckDB community `mssql` extension segfaults
-      # the worker (exit 139, core dumped) INTERMITTENTLY under concurrent
-      # access against an attached SQL Server: at threads=4 it crashed
-      # `dbt seed` (3 concurrent seeds) on main run 27032382694 yet passed
-      # once on the same commit's PR (2026-06-05).
+      # Multi-threaded. The DuckDB community `mssql` extension is now
+      # thread-safe under concurrent reads/writes against an attached SQL
+      # Server -- the fix (hugr-lab/mssql-extension PR #127, "Thread-safe
+      # catalog entry lifetime") reached the community CDN: `INSTALL mssql
+      # FROM community` resolves to build 51f4781 (2026-06-07, 30 commits
+      # past the PR #127 merge, DuckDB submodule pinned to v1.5.3).
       #
-      # The thread-safety fix (hugr-lab/mssql-extension PR #127, "Thread-
-      # safe catalog entry lifetime") is in the v0.2.1 release (commit
-      # 3c100e9, 2026-06-05) -- but `INSTALL mssql FROM community` still
-      # resolves to v0.2.0 (commit da0204c, 2026-05-20), which PREDATES
-      # the fix. The community-extensions CDN had not published v0.2.1
-      # yet, so CI was never actually running the fixed build. Verify the
-      # installed build with:
+      # History: builds <= v0.2.0 (commit da0204c) segfaulted the worker
+      # (exit 139, core dumped) INTERMITTENTLY at threads >= 2 -- e.g.
+      # `dbt seed` crashed on main run 27032382694 -- so this was pinned
+      # to 1. Verify the installed build before trusting concurrency:
       #   SELECT extension_version FROM duckdb_extensions()
       #   WHERE extension_name='mssql';   -- commit hash, not the tag
-      # Bump back to threads: 4 once that hash is 3c100e9 (v0.2.1) or
-      # later AND the nightly stress workflow stays green at threads=4/8.
-      threads: 1
+      # If a regression resurfaces (intermittent exit 139), drop back to
+      # threads: 1; the nightly stress workflow also probes threads=4/8.
+      threads: 4
       extensions:
         - httpfs
         - azure
