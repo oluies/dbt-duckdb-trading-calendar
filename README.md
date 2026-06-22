@@ -8,9 +8,9 @@
 | [![Elementary report](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml) | **Elementary** — scheduled OSS data-observability HTML report |
 | [![dbt-core](https://img.shields.io/badge/dbt--core-1.11.11-FF694B?logo=dbt&logoColor=white)](https://github.com/dbt-labs/dbt-core) | **dbt-core** `1.11.11` — pinned in `requirements.txt` |
 | [![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.10.1-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb) | **dbt-duckdb** adapter `1.10.1` — pinned in `requirements.txt` |
-| [![DuckDB](https://img.shields.io/badge/DuckDB-v1.5.3-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org) | **DuckDB** engine `v1.5.3` |
-| [![ext: httpfs](https://img.shields.io/badge/ext%3A%20httpfs-52afb42-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/httpfs/overview) | **httpfs** core extension — reads the remote Parquet over HTTPS — installed `52afb42` |
-| [![ext: azure](https://img.shields.io/badge/ext%3A%20azure-2ad247d-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/azure) | **azure** core extension — Azure blob storage access for the Open Datasets feed — installed `2ad247d` |
+| [![DuckDB](https://img.shields.io/badge/DuckDB-v1.5.4-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org) | **DuckDB** engine `v1.5.4` |
+| [![ext: httpfs](https://img.shields.io/badge/ext%3A%20httpfs-c3f215a-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/httpfs/overview) | **httpfs** core extension — reads the remote Parquet over HTTPS — installed `c3f215a` |
+| [![ext: azure](https://img.shields.io/badge/ext%3A%20azure-563589b-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/azure) | **azure** core extension — Azure blob storage access for the Open Datasets feed — installed `563589b` |
 | [![ext: mssql](https://img.shields.io/badge/ext%3A%20mssql-51f4781-blue?logo=microsoftsqlserver&logoColor=white)](https://github.com/hugr-lab/mssql-extension) | **mssql** community extension — `ATTACH`es SQL Server so dbt writes the marts there — installed `51f4781` |
 <!-- BADGES:END -->
 
