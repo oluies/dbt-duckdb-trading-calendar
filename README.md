@@ -11,7 +11,7 @@
 | [![DuckDB](https://img.shields.io/badge/DuckDB-v1.5.5-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org) | **DuckDB** engine `v1.5.5` |
 | [![ext: httpfs](https://img.shields.io/badge/ext%3A%20httpfs-827222f-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/httpfs/overview) | **httpfs** core extension — reads the remote Parquet over HTTPS — installed `827222f` |
 | [![ext: azure](https://img.shields.io/badge/ext%3A%20azure-003214c-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/azure) | **azure** core extension — Azure blob storage access for the Open Datasets feed — installed `003214c` |
-| [![ext: mssql](https://img.shields.io/badge/ext%3A%20mssql-39e547c-blue?logo=microsoftsqlserver&logoColor=white)](https://github.com/hugr-lab/mssql-extension) | **mssql** community extension — `ATTACH`es SQL Server so dbt writes the marts there — installed `39e547c` |
+| [![ext: mssql](https://img.shields.io/badge/ext%3A%20mssql-37596c2-blue?logo=microsoftsqlserver&logoColor=white)](https://github.com/hugr-lab/mssql-extension) | **mssql** community extension — `ATTACH`es SQL Server so dbt writes the marts there — installed `37596c2` |
 <!-- BADGES:END -->
 
 A dbt project that builds a **date dimension** plus a **normalized,
