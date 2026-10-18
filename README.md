@@ -6,8 +6,8 @@
 | --- | --- |
 | [![CI](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/ci.yml) | **CI** — `dbt build` + test against SQL Server 2022 on every push / PR |
 | [![Elementary report](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml) | **Elementary** — scheduled OSS data-observability HTML report |
-| [![dbt-core](https://img.shields.io/badge/dbt--core-1.11.11-FF694B?logo=dbt&logoColor=white)](https://github.com/dbt-labs/dbt-core) | **dbt-core** `1.11.11` — pinned in `requirements.txt` |
-| [![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.10.1-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb) | **dbt-duckdb** adapter `1.10.1` — pinned in `requirements.txt` |
+| [![dbt-core](https://img.shields.io/badge/dbt--core-1.12.3-FF694B?logo=dbt&logoColor=white)](https://github.com/dbt-labs/dbt-core) | **dbt-core** `1.12.3` — pinned in `requirements.txt` |
+| [![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.11.0-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb) | **dbt-duckdb** adapter `1.11.0` — pinned in `requirements.txt` |
 | [![DuckDB](https://img.shields.io/badge/DuckDB-v1.5.6-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org) | **DuckDB** engine `v1.5.6` |
 | [![ext: httpfs](https://img.shields.io/badge/ext%3A%20httpfs-4bc690d-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/httpfs/overview) | **httpfs** core extension — reads the remote Parquet over HTTPS — installed `4bc690d` |
 | [![ext: azure](https://img.shields.io/badge/ext%3A%20azure-003214c-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/azure) | **azure** core extension — Azure blob storage access for the Open Datasets feed — installed `003214c` |
