@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Europe/Stockholm",
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Was the pip ecosystem's 'dbt' group in .github/dependabot.yml (patterns dbt-*, duckdb), weekly on monday, limit 5, labels dependencies + python. Its comment read: 'Group dbt packages so a dbt-core bump and a dbt-duckdb bump land in one PR - they almost always need to move together.'",
+      "matchManagers": ["pip_requirements", "pip-compile", "pep621"],
+      "matchPackageNames": ["dbt-*", "duckdb"],
+      "groupName": "dbt",
+      "addLabels": ["python"]
+    },
+    {
+      "description": "The rest of the pip ecosystem, which Dependabot left ungrouped.",
+      "matchManagers": ["pip_requirements", "pip-compile", "pep621"],
+      "matchPackageNames": ["*", "!dbt-*", "!duckdb"],
+      "groupName": "python dependencies",
+      "addLabels": ["python"]
+    },
+    {
+      "description": "Was the github-actions 'actions' group (patterns: *), weekly on monday, limit 5, labels dependencies + github-actions.",
+      "matchManagers": ["github-actions"],
+      "groupName": "actions",
+      "addLabels": ["github-actions"]
+    },
+    {
+      "description": "Was the docker-compose ecosystem, weekly on monday, limit 3, labels dependencies + docker. Covers the SQL Server 2022 + Azure SQL Edge base images.",
+      "matchManagers": ["docker-compose", "dockerfile"],
+      "groupName": "docker images",
+      "addLabels": ["docker"]
+    }
+  ]
+}
