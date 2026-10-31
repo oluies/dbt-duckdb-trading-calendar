@@ -28,6 +28,9 @@ SQLCMD_TLS   := -C
 endif
 
 COMPOSE := docker compose -f $(COMPOSE_FILE)
+# db-init runs on the host and needs the duckdb package from
+# requirements.txt (activate the venv first, or override PYTHON).
+PYTHON  ?= python3
 SERVICE := mssql
 
 .PHONY: help db-up db-down db-shell db-init db-logs db-status db-viewer db-viewer-down
@@ -65,11 +68,7 @@ db-shell:
 
 db-init:
 	@test -n "$$SA_PASSWORD" || (echo "SA_PASSWORD not set." && exit 1)
-	$(COMPOSE) exec -T $(SERVICE) $(SQLCMD) -S localhost -U sa -P "$$SA_PASSWORD" $(SQLCMD_TLS) -b -Q \
-	  "IF DB_ID('Referensdata') IS NULL CREATE DATABASE Referensdata;"
-	$(COMPOSE) exec -T $(SERVICE) $(SQLCMD) -S localhost -U sa -P "$$SA_PASSWORD" $(SQLCMD_TLS) -b -d Referensdata -Q \
-	  "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'azuredl') EXEC('CREATE SCHEMA azuredl');"
-	@echo "Referensdata.azuredl is ready."
+	$(PYTHON) scripts/db_init.py
 
 db-logs:
 	$(COMPOSE) logs -f $(SERVICE)

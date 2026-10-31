@@ -71,6 +71,11 @@ jobs:
       - name: Start SQL Server (docker compose)
         run: make db-up
 
+      - name: Install dbt + edr
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-elementary.txt
+
       - name: Create Referensdata + azuredl schemas
         # db-init handles Referensdata + azuredl. Elementary's tables
         # land in Referensdata.main_elementary (`+schema: elementary`
@@ -78,11 +83,6 @@ jobs:
         # that schema inside the attached SQL Server -- no pre-create
         # step needed.
         run: make db-init
-
-      - name: Install dbt + edr
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-elementary.txt
 
       - name: dbt deps
         run: dbt deps
