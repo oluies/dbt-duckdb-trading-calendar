@@ -7,7 +7,7 @@
 | [![CI](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/ci.yml) | **CI** — `dbt build` + test against SQL Server 2022 on every push / PR |
 | [![Elementary report](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml/badge.svg)](https://github.com/oluies/dbt-duckdb-trading-calendar/actions/workflows/elementary.yml) | **Elementary** — scheduled OSS data-observability HTML report |
 | [![dbt-core](https://img.shields.io/badge/dbt--core-1.12.3-FF694B?logo=dbt&logoColor=white)](https://github.com/dbt-labs/dbt-core) | **dbt-core** `1.12.3` — pinned in `requirements.txt` |
-| [![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.11.0-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb) | **dbt-duckdb** adapter `1.11.0` — pinned in `requirements.txt` |
+| [![dbt-duckdb](https://img.shields.io/badge/dbt--duckdb-1.11.1-FF694B?logo=dbt&logoColor=white)](https://github.com/duckdb/dbt-duckdb) | **dbt-duckdb** adapter `1.11.1` — pinned in `requirements.txt` |
 | [![DuckDB](https://img.shields.io/badge/DuckDB-v2.0.0-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org) | **DuckDB** engine `v2.0.0` |
 | [![ext: httpfs](https://img.shields.io/badge/ext%3A%20httpfs-77392a7207-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/httpfs/overview) | **httpfs** core extension — reads the remote Parquet over HTTPS — installed `77392a7207` |
 | [![ext: azure](https://img.shields.io/badge/ext%3A%20azure-906e92458c-FFF000?logo=duckdb&logoColor=black)](https://duckdb.org/docs/stable/core_extensions/azure) | **azure** core extension — Azure blob storage access for the Open Datasets feed — installed `906e92458c` |
@@ -425,10 +425,10 @@ community-repo release.
 
 It is **disabled** because DuckDB extensions are ABI-coupled to
 libduckdb, and the upstream build is against a duckdb-main snapshot
-(commit `f480e78`, 2026-02-13) -- not the released `1.5.x` line we
+(commit `f480e78`, 2026-02-13) -- not the released `2.x` line we
 get from pip. Loading the upstream binary into pip's duckdb fails
 with "extension built for different DuckDB version". Two dispatched
-runs confirmed this.
+runs (on DuckDB 1.5.x) confirmed this.
 
 **Reactivate** by renaming the file back to `.yml` once the upstream
 fix lands in a tagged community release -- at that point the workflow's

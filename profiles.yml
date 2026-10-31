@@ -7,9 +7,11 @@ holiday_loader:
       # Multi-threaded. The DuckDB community `mssql` extension is now
       # thread-safe under concurrent reads/writes against an attached SQL
       # Server -- the fix (hugr-lab/mssql-extension PR #127, "Thread-safe
-      # catalog entry lifetime") reached the community CDN: `INSTALL mssql
-      # FROM community` resolves to build 51f4781 (2026-06-07, 30 commits
-      # past the PR #127 merge, DuckDB submodule pinned to v1.5.3).
+      # catalog entry lifetime") reached the community CDN. On DuckDB
+      # 2.0.0 `INSTALL mssql FROM community` resolves to mssql v0.3.0
+      # (verified at threads: 4 against Azure SQL Edge). On DuckDB 1.5.x
+      # it resolved to build 51f4781 (2026-06-07, 30 commits past the
+      # PR #127 merge, DuckDB submodule pinned to v1.5.3).
       #
       # History: builds <= v0.2.0 (commit da0204c) segfaulted the worker
       # (exit 139, core dumped) INTERMITTENTLY at threads >= 2 -- e.g.
