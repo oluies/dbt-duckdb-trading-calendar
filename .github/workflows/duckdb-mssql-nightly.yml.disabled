@@ -7,7 +7,7 @@
 # from upstream hugr-lab/mssql-extension CI is built against the
 # duckdb submodule pinned to commit f480e78 (a 2026-02-13 dev
 # snapshot from duckdb/main), not a tagged release. Our pip-installed
-# duckdb is the released 1.5.x line, so loading the upstream binary
+# duckdb is a released line (2.x since the DuckDB 2.0 bump), so loading the upstream binary
 # fails with "extension built for different DuckDB version".
 #
 # Two dispatched runs confirmed this:

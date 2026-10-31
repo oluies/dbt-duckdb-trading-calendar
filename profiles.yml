@@ -9,7 +9,9 @@ holiday_loader:
       # Server -- the fix (hugr-lab/mssql-extension PR #127, "Thread-safe
       # catalog entry lifetime") reached the community CDN: `INSTALL mssql
       # FROM community` resolves to build 51f4781 (2026-06-07, 30 commits
-      # past the PR #127 merge, DuckDB submodule pinned to v1.5.3).
+      # past the PR #127 merge, DuckDB submodule pinned to v1.5.3). On
+      # DuckDB 2.0.0 the community CDN serves mssql v0.3.0 (newer than
+      # the crashing <= v0.2.0 builds below).
       #
       # History: builds <= v0.2.0 (commit da0204c) segfaulted the worker
       # (exit 139, core dumped) INTERMITTENTLY at threads >= 2 -- e.g.
