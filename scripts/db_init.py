@@ -48,6 +48,9 @@ def main() -> int:
             attach(con, "master_db", "master", password)
             break
         except duckdb.Error as e:
+            # Retry login failures too: while starting up, Azure SQL Edge
+            # rejects the correct password with 18456 state 1, the same
+            # error a wrong one gets, so the two can't be told apart here.
             if time.monotonic() > deadline:
                 raise
             print(f"Waiting for SQL Server: {e}", file=sys.stderr)

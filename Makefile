@@ -35,7 +35,7 @@ help:
 	@echo "Targets (set PLATFORM=arm-mac on Apple Silicon for native arm64):"
 	@echo "  db-up      Start SQL Server (waits for healthy)"
 	@echo "  db-down    Stop SQL Server (keeps volume)"
-	@echo "  db-shell   Open a sqlcmd shell inside the container"
+	@echo "  db-shell   Open a sqlcmd shell (arm-mac: needs sqlcmd on the host)"
 	@echo "  db-init    Create Referensdata database and azuredl schema"
 	@echo "  db-logs    Tail SQL Server logs"
 	@echo "  db-status  Show container + healthcheck status"
