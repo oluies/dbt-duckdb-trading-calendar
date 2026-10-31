@@ -428,7 +428,7 @@ libduckdb, and the upstream build is against a duckdb-main snapshot
 (commit `f480e78`, 2026-02-13) -- not the released `2.x` line we
 get from pip. Loading the upstream binary into pip's duckdb fails
 with "extension built for different DuckDB version". Two dispatched
-runs confirmed this.
+runs (on DuckDB 1.5.x) confirmed this.
 
 **Reactivate** by renaming the file back to `.yml` once the upstream
 fix lands in a tagged community release -- at that point the workflow's
