@@ -425,7 +425,7 @@ community-repo release.
 
 It is **disabled** because DuckDB extensions are ABI-coupled to
 libduckdb, and the upstream build is against a duckdb-main snapshot
-(commit `f480e78`, 2026-02-13) -- not the released `1.5.x` line we
+(commit `f480e78`, 2026-02-13) -- not the released `2.x` line we
 get from pip. Loading the upstream binary into pip's duckdb fails
 with "extension built for different DuckDB version". Two dispatched
 runs confirmed this.
