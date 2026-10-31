@@ -73,23 +73,11 @@ for ($i = 1; $i -le 60; $i++) {
 }
 if (-not $healthy) { Die "SQL Server did not become healthy in time." }
 
-# Detect the bundled sqlcmd path (SQL Server uses mssql-tools18; Azure SQL
-# Edge uses the older mssql-tools).
+# Detect the bundled sqlcmd path for the row-count report (SQL Server uses
+# mssql-tools18; azure-sql-edge:latest ships none, so the report is skipped).
 $Sqlcmd = "/opt/mssql-tools18/bin/sqlcmd"; $Tls = "-C"
 docker exec $DbContainer test -x $Sqlcmd *> $null
 if ($LASTEXITCODE -ne 0) { $Sqlcmd = "/opt/mssql-tools/bin/sqlcmd"; $Tls = "" }
-
-function Invoke-Sql {
-  param([string]$Sql, [string]$Db = "")
-  $a = @("-S", "localhost", "-U", "sa", "-P", $pw, "-b")
-  if ($Tls) { $a += $Tls }
-  if ($Db)  { $a += @("-d", $Db) }
-  $Sql | docker exec -i $DbContainer $Sqlcmd @a    # SQL via stdin -> no arg-quoting issues
-}
-
-Info "Creating Referensdata + azuredl schema..."
-Invoke-Sql "IF DB_ID('Referensdata') IS NULL CREATE DATABASE Referensdata;"
-Invoke-Sql "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'azuredl') EXEC('CREATE SCHEMA azuredl');" "Referensdata"
 
 # --- ensure a dbt with the DuckDB adapter ----------------------------------
 Say "2/4  Preparing dbt (dbt-core + dbt-duckdb)"
@@ -115,6 +103,11 @@ if (Test-Path $DbtExe) {
   & ".venv\Scripts\python.exe" -m pip install -q --upgrade pip
   & ".venv\Scripts\pip.exe" install -q -r requirements.txt
 }
+
+# scripts/db_init.py (same as `make db-init`) needs duckdb from the venv.
+Info "Creating Referensdata + azuredl schema..."
+& ".venv\Scripts\python.exe" scripts\db_init.py
+if ($LASTEXITCODE -ne 0) { Die "db-init failed." }
 
 # --- build the marts -------------------------------------------------------
 Say "3/4  Building marts into Referensdata (dbt seed + run)"

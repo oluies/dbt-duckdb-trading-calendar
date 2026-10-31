@@ -14,10 +14,14 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 import duckdb
 
 SERVER = "localhost,1433"
+# The port opens before SQL Server accepts logins (the arm healthcheck is a
+# TCP probe), so keep retrying the first ATTACH for a while.
+CONNECT_TIMEOUT_S = 120
 
 
 def attach(con: duckdb.DuckDBPyConnection, alias: str, database: str, password: str) -> None:
@@ -38,7 +42,16 @@ def main() -> int:
     con.execute("INSTALL mssql FROM community")
     con.execute("LOAD mssql")
 
-    attach(con, "master_db", "master", password)
+    deadline = time.monotonic() + CONNECT_TIMEOUT_S
+    while True:
+        try:
+            attach(con, "master_db", "master", password)
+            break
+        except duckdb.Error as e:
+            if time.monotonic() > deadline:
+                raise
+            print(f"Waiting for SQL Server: {e}", file=sys.stderr)
+            time.sleep(3)
     con.execute(
         "SELECT mssql_exec('master_db', ?)",
         ["IF DB_ID('Referensdata') IS NULL CREATE DATABASE Referensdata;"],

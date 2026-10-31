@@ -94,6 +94,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Write .env
+        run: |
+          cat > .env <<EOF
+          SA_PASSWORD=${SA_PASSWORD}
+          AZURE_CA_CERT_FILE=${AZURE_CA_CERT_FILE}
+          EOF
+
+      - name: Start SQL Server
+        run: make db-up
+
+      - name: Create Referensdata + azuredl schemas
+        # Before the extension placement below: db_init.py runs
+        # `INSTALL mssql FROM community`, which would otherwise
+        # overwrite (or refuse to load) the unsigned upstream binary.
+        run: make db-init
+
       - name: Download upstream mssql extension artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -130,19 +146,6 @@ jobs:
               shutil.copy2(src, dst)
               print(f"placed {src} -> {dst}")
           PY
-
-      - name: Write .env
-        run: |
-          cat > .env <<EOF
-          SA_PASSWORD=${SA_PASSWORD}
-          AZURE_CA_CERT_FILE=${AZURE_CA_CERT_FILE}
-          EOF
-
-      - name: Start SQL Server
-        run: make db-up
-
-      - name: Create Referensdata + azuredl schemas
-        run: make db-init
 
       - name: dbt deps
         run: dbt deps

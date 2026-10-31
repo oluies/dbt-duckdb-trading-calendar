@@ -2,13 +2,13 @@ SHELL := /bin/bash
 
 # Load .env so SA_PASSWORD etc. are available to recipes and to
 # `docker compose` (which reads .env from the project dir on its own,
-# but we also need it for sqlcmd invocations from the host).
+# but we also need it for the host-side db-init and db-shell).
 ifneq (,$(wildcard ./.env))
 include .env
 export
 endif
 
-# PLATFORM selects which compose file + bundled sqlcmd path to use.
+# PLATFORM selects which compose file + db-shell sqlcmd to use.
 #   PLATFORM=default  -> docker-compose.yml,   SQL Server 2022 (amd64)
 #   PLATFORM=arm-mac  -> docker-compose.arm.yml, Azure SQL Edge (arm64)
 # Override on the command line, e.g.:  make PLATFORM=arm-mac db-up
@@ -16,15 +16,11 @@ PLATFORM ?= default
 
 ifeq ($(PLATFORM),arm-mac)
 COMPOSE_FILE := docker-compose.arm.yml
-# Azure SQL Edge ships the older mssql-tools path.
-SQLCMD       := /opt/mssql-tools/bin/sqlcmd
-SQLCMD_TLS   :=
+# azure-sql-edge:latest ships no sqlcmd, so db-shell needs one on the host.
+DB_SHELL     := sqlcmd -S localhost,1433
 else
 COMPOSE_FILE := docker-compose.yml
-SQLCMD       := /opt/mssql-tools18/bin/sqlcmd
-# mssql-tools18 defaults to encrypted connections and rejects the
-# self-signed cert that ships with the dev image; -C trusts it.
-SQLCMD_TLS   := -C
+DB_SHELL     := docker compose -f $(COMPOSE_FILE) exec mssql /opt/mssql-tools18/bin/sqlcmd -S localhost
 endif
 
 COMPOSE := docker compose -f $(COMPOSE_FILE)
@@ -63,8 +59,9 @@ db-up:
 db-down:
 	$(COMPOSE) down
 
+# -C trusts the self-signed cert that ships with the dev images.
 db-shell:
-	$(COMPOSE) exec $(SERVICE) $(SQLCMD) -S localhost -U sa -P "$$SA_PASSWORD" $(SQLCMD_TLS)
+	$(DB_SHELL) -U sa -P "$$SA_PASSWORD" -C
 
 db-init:
 	@test -n "$$SA_PASSWORD" || (echo "SA_PASSWORD not set." && exit 1)
