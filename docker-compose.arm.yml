@@ -9,8 +9,10 @@
 #   * Azure SQL Edge has been announced end-of-support (Sept 2025);
 #     it's still the practical native-arm64 dev option in 2026, but is
 #     not for production.
-#   * Its sqlcmd lives at /opt/mssql-tools/bin/sqlcmd (no "18"). The
-#     Makefile picks the right binary via PLATFORM=arm-mac.
+#   * azure-sql-edge:latest ships no sqlcmd at all, so the healthcheck
+#     is a TCP probe and `make db-init` runs on the host through DuckDB's
+#     mssql extension (scripts/db_init.py). `make db-shell` uses a
+#     host-installed sqlcmd on this platform.
 #   * The wire protocol is SQL Server-compatible, so dbt-duckdb's mssql
 #     ATTACH driver talks to it unchanged.
 #
@@ -32,17 +34,10 @@ services:
       - "1433:1433"
     volumes:
       - mssql_data:/var/opt/mssql
-    # Azure SQL Edge ships sqlcmd at the older path. The healthcheck
-    # tolerates either by trying both, so the same compose file works
-    # if Microsoft updates the bundled tools.
+    # No sqlcmd in the image, so this only checks that 1433 accepts TCP.
+    # Logins can lag a little behind; scripts/db_init.py retries for that.
     healthcheck:
-      test:
-        - CMD-SHELL
-        - >
-          (
-            /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" -b -l 5
-            || /opt/mssql-tools/bin/sqlcmd   -S localhost -U sa -P "$$MSSQL_SA_PASSWORD"    -Q "SELECT 1" -b -l 5
-          ) || exit 1
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/1433"]
       interval: 10s
       timeout: 10s
       retries: 12

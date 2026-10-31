@@ -61,7 +61,6 @@ fi
 
 say "1/4  Starting SQL Server  --  arch=$ARCH -> $DB_IMAGE (PLATFORM=$PLATFORM)"
 make PLATFORM="$PLATFORM" db-up
-make PLATFORM="$PLATFORM" db-init
 
 # --- ensure a dbt with the DuckDB adapter ----------------------------------
 # The repo's requirements pin dbt-core + dbt-duckdb. A global dbt often lacks
@@ -86,6 +85,10 @@ else
   .venv/bin/pip install -q -r requirements.txt
   DBT=.venv/bin/dbt
 fi
+
+# db-init runs scripts/db_init.py, which needs duckdb from the venv.
+info "Creating Referensdata + azuredl schema..."
+make PLATFORM="$PLATFORM" PYTHON=.venv/bin/python db-init
 
 # --- build the marts -------------------------------------------------------
 say "3/4  Building marts into Referensdata (dbt seed + run)"

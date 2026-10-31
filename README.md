@@ -104,6 +104,12 @@ make PLATFORM=arm-mac db-init
 dbt creates and drops the **tables** inside that schema; the schema
 itself is created here so no model needs `CREATE SCHEMA` privileges.
 
+`db-init` runs `scripts/db_init.py` on the host, which connects through
+DuckDB's `mssql` extension (`mssql_exec`) rather than `sqlcmd` in the
+container (`azure-sql-edge:latest` no longer ships `sqlcmd`). It needs
+the `duckdb` package, so create the venv from step 4 first, or point
+`make PYTHON=...` at an interpreter that has it.
+
 ### 4. Install dbt and run
 
 ```bash
