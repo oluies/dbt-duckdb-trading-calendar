@@ -6,26 +6,71 @@
 <title>SEK/EUR volatility regimes</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
-  /* Light by default; dark follows the OS unless the host sets data-theme
-     on the root, which wins either way. The chart reads these tokens. */
-  :root { --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea; --row: #f5f5f7; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #131316; --fg: #ececf0; --muted: #9a9aa2; --line: #2c2c31; --row: #1d1d22; color-scheme: dark; }
+  /* Colour tokens. Every palette meets WCAG 2.1 AA: text (--fg, --muted on
+     --bg and --row) 4.5:1; chart lines, the --ramp colours and --focus 3:1
+     against --bg. The chart and the regime swatches read these tokens
+     (Theme.scala), so add a palette here and nowhere else.
+
+     Order of precedence: the reader's Background choice (data-bg), then the
+     host's data-theme, then the OS setting. White is the default. */
+  :root {
+    --bg: #ffffff; --fg: #1b1c1f; --muted: #5c5f66; --line: #e3e5e8; --row: #f2f3f5; --focus: #1d5fbf;
+    --ramp-0: #9a5b12; --ramp-1: #c0392b; --ramp-2: #7a2e9e; --band-alpha: 0.20;
   }
-  :root[data-theme="dark"] { --bg: #131316; --fg: #ececf0; --muted: #9a9aa2; --line: #2c2c31; --row: #1d1d22; color-scheme: dark; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1d21; --fg: #eceef1; --muted: #a7abb3; --line: #2e3137; --row: #25282d; --focus: #8cb8ff;
+      --ramp-0: #e8a65e; --ramp-1: #f2788c; --ramp-2: #c79bf2; --band-alpha: 0.30; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1d21; --fg: #eceef1; --muted: #a7abb3; --line: #2e3137; --row: #25282d; --focus: #8cb8ff;
+    --ramp-0: #e8a65e; --ramp-1: #f2788c; --ramp-2: #c79bf2; --band-alpha: 0.30; color-scheme: dark;
+  }
+  :root[data-bg="white"] {
+    --bg: #ffffff; --fg: #1b1c1f; --muted: #5c5f66; --line: #e3e5e8; --row: #f2f3f5; --focus: #1d5fbf;
+    --ramp-0: #9a5b12; --ramp-1: #c0392b; --ramp-2: #7a2e9e; --band-alpha: 0.20; color-scheme: light;
+  }
+  :root[data-bg="lightgrey"] {
+    --bg: #eceef1; --fg: #1b1c1f; --muted: #53565d; --line: #d6d9de; --row: #e1e4e8; --focus: #1a55ab;
+    --ramp-0: #9a5b12; --ramp-1: #c0392b; --ramp-2: #7a2e9e; --band-alpha: 0.20; color-scheme: light;
+  }
+  :root[data-bg="darkgrey"] {
+    --bg: #1b1d21; --fg: #eceef1; --muted: #a7abb3; --line: #2e3137; --row: #25282d; --focus: #8cb8ff;
+    --ramp-0: #e8a65e; --ramp-1: #f2788c; --ramp-2: #c79bf2; --band-alpha: 0.30; color-scheme: dark;
+  }
+  :root[data-bg="black"] {
+    --bg: #000000; --fg: #f1f2f4; --muted: #a9adb5; --line: #24262a; --row: #16181b; --focus: #8cb8ff;
+    --ramp-0: #e8a65e; --ramp-1: #f2788c; --ramp-2: #c79bf2; --band-alpha: 0.30; color-scheme: dark;
+  }
+
   * { box-sizing: border-box; }
   body { margin: 0; padding-block: 16px; background: var(--bg); color: var(--fg);
          padding-left: max(16px, env(safe-area-inset-left, 0px));
          padding-right: max(16px, env(safe-area-inset-right, 0px));
          font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 1200px; margin: 0 auto; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .top { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: flex-start; justify-content: space-between; }
+  .top > div { flex: 1 1 32rem; min-width: 0; }
   h1 { font-size: 18px; margin: 0 0 4px; text-wrap: balance; }
-  .sub { margin: 0 0 12px; color: var(--muted); }
+  .sub { margin: 0 0 12px; color: var(--muted); max-width: 80ch; }
+  .picker { display: flex; align-items: center; gap: 8px; color: var(--muted); white-space: nowrap; }
+  select, button { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--muted);
+                   border-radius: 6px; padding: 4px 8px; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; color: var(--muted); }
+
   .status { color: var(--muted); padding-block: 48px; }
-  .legend { min-height: 1.45em; margin-bottom: 6px; font-variant-numeric: tabular-nums; white-space: pre-wrap; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .legend { min-height: 1.45em; font-variant-numeric: tabular-nums; white-space: pre-wrap; min-width: 0; }
   .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin: 0 6px 0 0; vertical-align: -1px; }
   .legend .swatch { margin-left: 12px; margin-right: 4px; }
   .chart { height: 560px; }
+
   /* Scoped: Lightweight Charts lays itself out with a <table> too. */
   .regimes { width: 100%; border-collapse: collapse; margin-top: 16px; font-variant-numeric: tabular-nums; }
   .regimes th, .regimes td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -34,25 +79,27 @@
   .regimes th { color: var(--muted); font-weight: 600; }
   .regimes tbody tr { cursor: pointer; }
   .regimes tbody tr:hover, .regimes tbody tr.active { background: var(--row); }
+  .regimes button.regime { border: 1px solid transparent; background: transparent; padding: 2px 6px; margin-left: -7px; }
+  .regimes button.regime[aria-pressed="true"] { border-color: var(--muted); font-weight: 600; }
   .wrap { overflow-x: auto; }
+
   /* "How the regimes are found" */
   .explainer { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 8px; }
   /* Prose at a readable measure; the SQL blocks may use the full width. */
-  .explainer > p, .explainer .step > p, .explainer dl { max-width: 72ch; }
+  .explainer > p, .explainer .step > p, .explainer .step > div, .explainer dl { max-width: 72ch; }
   .explainer h2 { font-size: 17px; margin: 16px 0 4px; }
   .explainer h3 { font-size: 15px; margin: 24px 0 4px; }
-  .explainer p, .explainer dd { line-height: 1.55; }
+  .explainer p, .explainer dd, .explainer li { line-height: 1.55; }
   .explainer pre { background: var(--row); border: 1px solid var(--line); border-radius: 6px; padding: 12px;
                    overflow-x: auto; font-size: 12.5px; line-height: 1.5; margin: 8px 0 4px; }
   .explainer code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
   .explainer .source { margin: 0; font-size: 12px; color: var(--muted); }
-  .explainer .source a { color: inherit; }
   .explainer dl { margin: 8px 0 0; }
   .explainer dt { font-weight: 600; margin-top: 12px; }
-  .explainer dd { margin: 2px 0 0; color: var(--fg); }
+  .explainer dd { margin: 2px 0 0; }
   footer { margin-top: 12px; color: var(--muted); font-size: 12px; }
-  footer a { color: inherit; }
   @media (max-width: 640px) { .chart { height: 440px; } }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
 </head>
 <body>

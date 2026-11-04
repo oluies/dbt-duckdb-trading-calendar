@@ -129,6 +129,9 @@ jobs:
             ~/.cache/coursier
           key: mill-${{ runner.os }}-${{ hashFiles('web/build.mill', 'web/mill') }}
 
+      - name: Check colour contrast (WCAG 2.1 AA)
+        run: python3 scripts/check_contrast.py
+
       - name: Link Scala.js and assemble the site
         working-directory: web
         run: make dist
