@@ -23,6 +23,15 @@ directly from blob storage and writes the resulting tables into a
 SQL Server database (`Referensdata.azuredl`) over the DuckDB **mssql**
 extension's `ATTACH`.
 
+**Change point example.** An optional set of models puts the calendar to
+work on a market series. It splits the SEK/EUR exchange rate into
+volatility regimes with the [`cpt`](https://github.com/hugr-lab/duck-changepoint)
+DuckDB extension, indexed on Nasdaq Stockholm trading days. See
+[Change point example](#change-point-example-with_changepoint) for the
+models, a walkthrough of the code and how to run it.
+
+[![SEK/EUR volatility regimes](docs/fx_regimes.png)](#change-point-example-with_changepoint)
+
 ### DuckDB extensions
 
 The three `ext:` badges above track the extensions this project loads
@@ -399,26 +408,117 @@ rate-limited API. `scripts/fetch_riksbank_fx.py` refreshes it.
 | Model | Grain | What it does |
 | --- | --- | --- |
 | `stg_riksbank_fx` | fixing day | rate + log return vs. the previous fixing |
-| `fct_trading_day_fx` | weekday | joins `dim_date`, the XSTO calendar and the fixing; `is_xsto_trading_day` is NULL in years the exchange seed does not cover |
-| `fct_fx_regimes` | regime | `cpt_pelt(returns, 'normal', var('cpt_penalty'), var('cpt_min_regime_days'))`, then `cpt_segment_stats`: start/end date, trading days, mean return, daily and annualised volatility |
+| `fct_trading_day_fx` | weekday | joins `dim_date`, the XSTO calendar and the fixing |
+| `fct_fx_regimes` | regime | start/end date, trading days, mean return, daily and annualised volatility |
+
+```mermaid
+flowchart LR
+    seed[(riksbank_sekeur)] --> stg[stg_riksbank_fx]
+    dim[dim_date] --> tdf[fct_trading_day_fx]
+    xsto[fct_exchange_calendar] --> tdf
+    stg --> tdf --> reg[fct_fx_regimes]
+    cpt{{cpt extension}} -.-> reg
+```
+
+### How the code works
+
+**1. Returns** ([`stg_riksbank_fx.sql`](models/changepoint/stg_riksbank_fx.sql)).
+Change point detection wants a series whose behaviour is roughly
+constant within a regime. The rate itself wanders, but its daily log
+return does not, so the model takes the return against the previous
+*fixing* (not the previous calendar day):
+
+```sql
+100 * ln(sek_per_eur / lag(sek_per_eur) over (order by rate_date)) as log_return_pct
+```
+
+**2. Calendar join** ([`fct_trading_day_fx.sql`](models/changepoint/fct_trading_day_fx.sql)).
+One row per weekday from `dim_date`, left-joined to the XSTO exception
+days and the fixing. The exchange seed lists exceptions only, so a
+weekday with no row is a trading day, but only in years the seed covers.
+Elsewhere `is_xsto_trading_day` is NULL rather than a misleading `true`:
+
+```sql
+case
+    when cy.year_number is null then null          -- year not in the seed
+    else coalesce(x.is_trading_day, true)          -- no exception row = open
+end as is_xsto_trading_day
+```
+
+**3. Detection** ([`fct_fx_regimes.sql`](models/changepoint/fct_fx_regimes.sql)).
+`cpt` works on a whole series at once, so the returns are collected into
+a `DOUBLE[]` in date order, together with a parallel list of dates.
+`cpt_pelt` returns the 1-based positions where segments end;
+`cpt_segment_stats` turns those into one struct per segment (start, end,
+mean, sample variance, length); `unnest` makes it one row per regime;
+and indexing the date list maps positions back to calendar dates
+(simplified; the model reads the penalty and minimum length from vars):
+
+```sql
+with series as (
+    select list(log_return_pct order by date_day) as xs,
+           list(date_day       order by date_day) as days
+    from returns
+),
+segments as (
+    select days,
+           unnest(cpt_segment_stats(xs, cpt_pelt(xs, 'normal', 'mbic', 20))) as seg
+    from series
+)
+select days[seg.start] as start_date,
+       days[seg."end"] as end_date,
+       seg.n           as trading_days,
+       sqrt(seg.var * 252) as annualised_vol_pct
+from segments
+```
 
 The `normal` cost detects changes in mean *and* variance. FX returns keep
 a mean near zero, so what it finds are volatility shifts: COVID in spring
 2020 (13.6 % annualised) and the April 2025 tariff shock (14.0 %),
-against 4–7 % in calm regimes. `cpt_penalty` (default `mbic`, R
-changepoint's convention; also `bic`, `aic` or a number) and
-`cpt_min_regime_days` (default 20) control how many breaks survive.
+against 4–7 % in calm regimes. The penalty sets how much a new break
+must improve the fit before it is kept: `cpt_penalty` defaults to `mbic`
+(R changepoint's convention; `bic`, `aic` or a number also work), and
+`cpt_min_regime_days` (default 20) stops one wild week from becoming a
+regime of its own. Raise either and fewer regimes survive.
+
+Lists and structs never leave DuckDB: the query computes everything,
+then only scalar columns are written to SQL Server, so the table
+materialises in `Referensdata` like the rest of the project.
+
+**4. Loading the extension** ([`macros/load_cpt.sql`](macros/load_cpt.sql), `profiles.yml`).
+`fct_fx_regimes` has a pre-hook, `{{ load_cpt() }}`, that runs
+`LOAD '<CPT_EXTENSION_PATH>'` and stops with a clear error if the
+variable is unset. The path is read inside a macro because dbt evaluates
+`env_var()` in `dbt_project.yml` at parse time, which would break every
+run without it. `cpt` ships unsigned and `allow_unsigned_extensions` can
+only be set when DuckDB starts, so `profiles.yml` passes it in
+`config_options`, switched on only when `CPT_EXTENSION_PATH` is set.
+
+**5. Chart** ([`scripts/plot_fx_regimes.py`](scripts/plot_fx_regimes.py)).
+It reads `fct_trading_day_fx` and `fct_fx_regimes` back from SQL Server
+through DuckDB's `mssql` extension and draws the figure above with
+seaborn. The top panel shows the rate with each regime shaded by
+volatility, and the bottom panel shows the returns with each regime's
+mean ± 2σ band.
+
+### Tests
 
 The calendar is the index, and it is checked against the data:
-`tests/assert_fx_fixings_match_xsto_calendar.sql` asserts that, in years
+[`tests/assert_fx_fixings_match_xsto_calendar.sql`](tests/assert_fx_fixings_match_xsto_calendar.sql) asserts that, in years
 the exchange seed covers, the Riksbank publishes on exactly the XSTO
 trading days. That test caught New Year's Eve, which the seed listed as
 a half-day session; Nasdaq Stockholm is closed on 31 December. Two more
-tests check that the regimes tile the return series, and that the 2020
-and 2025 stress dates fall in regimes with at least twice the median
-volatility.
+tests check that the regimes tile the return series
+([`assert_fx_regimes_tile_series.sql`](tests/assert_fx_regimes_tile_series.sql)),
+and that the 2020 and 2025 stress dates fall in regimes with at least
+twice the median volatility
+([`assert_fx_stress_dates_in_high_vol_regimes.sql`](tests/assert_fx_stress_dates_in_high_vol_regimes.sql)).
+The second fails if the penalty is set so high that the stress episodes
+merge into calm regimes.
 
-**Running it.** `cpt` is not in a DuckDB extension repository yet, so
+### Running it
+
+`cpt` is not in a DuckDB extension repository yet, so
 build it and point `CPT_EXTENSION_PATH` at the binary. When that variable
 is set, `profiles.yml` enables `allow_unsigned_extensions`; otherwise
 signature checks stay on.
@@ -432,9 +532,7 @@ dbt build --vars '{with_changepoint: true}' --select tag:changepoint
 uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
 ```
 
-The models build into `Referensdata` like the rest of the project; only
-scalar columns cross to SQL Server, since the list work stays inside the
-DuckDB query. CI builds `cpt` at a pinned commit (`CPT_REF` in
+CI builds `cpt` at a pinned commit (`CPT_REF` in
 `.github/workflows/ci.yml`) and runs these models after the main build.
 
 ---
