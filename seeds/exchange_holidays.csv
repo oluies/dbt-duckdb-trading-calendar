@@ -14,7 +14,7 @@ calendar_date,exchange_code,exchange_name,country_code,is_trading_day,is_settlem
 2024-12-24,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Eve
 2024-12-25,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Day
 2024-12-26,XSTO,Nasdaq Stockholm,SE,false,false,Boxing Day
-2024-12-31,XSTO,Nasdaq Stockholm,SE,true,true,New Year's Eve (half-day)
+2024-12-31,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Eve
 2025-01-01,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Day
 2025-01-06,XSTO,Nasdaq Stockholm,SE,false,false,Epiphany
 2025-04-17,XSTO,Nasdaq Stockholm,SE,true,true,Maundy Thursday (half-day)
@@ -29,7 +29,7 @@ calendar_date,exchange_code,exchange_name,country_code,is_trading_day,is_settlem
 2025-12-24,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Eve
 2025-12-25,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Day
 2025-12-26,XSTO,Nasdaq Stockholm,SE,false,false,Boxing Day
-2025-12-31,XSTO,Nasdaq Stockholm,SE,true,true,New Year's Eve (half-day)
+2025-12-31,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Eve
 2026-01-01,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Day
 2026-01-06,XSTO,Nasdaq Stockholm,SE,false,false,Epiphany
 2026-04-02,XSTO,Nasdaq Stockholm,SE,true,true,Maundy Thursday (half-day)
@@ -43,4 +43,4 @@ calendar_date,exchange_code,exchange_name,country_code,is_trading_day,is_settlem
 2026-06-19,XSTO,Nasdaq Stockholm,SE,false,false,Midsummer Eve
 2026-12-24,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Eve
 2026-12-25,XSTO,Nasdaq Stockholm,SE,false,false,Christmas Day
-2026-12-31,XSTO,Nasdaq Stockholm,SE,true,true,New Year's Eve (half-day)
+2026-12-31,XSTO,Nasdaq Stockholm,SE,false,false,New Year's Eve
