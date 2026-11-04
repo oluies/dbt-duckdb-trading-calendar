@@ -28,7 +28,9 @@ work on a market series. It splits the SEK/EUR exchange rate into
 volatility regimes with the [`cpt`](https://github.com/hugr-lab/duck-changepoint)
 DuckDB extension, indexed on Nasdaq Stockholm trading days. See
 [Change point example](#change-point-example-with_changepoint) for the
-models, a walkthrough of the code and how to run it.
+models, a walkthrough of the code and how to run it. An interactive
+version, drawn with TradingView Lightweight Charts, is in
+[`docs/fx_regimes.html`](docs/fx_regimes.html).
 
 [![SEK/EUR volatility regimes](docs/fx_regimes.png)](#change-point-example-with_changepoint)
 
@@ -501,6 +503,26 @@ seaborn. The top panel shows the rate with each regime shaded by
 volatility, and the bottom panel shows the returns with each regime's
 mean ± 2σ band.
 
+**6. Interactive chart** ([`scripts/chart_fx_regimes_tv.py`](scripts/chart_fx_regimes_tv.py)).
+The same data drawn with [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/)
+(Apache-2.0) into one self-contained page, [`docs/fx_regimes.html`](docs/fx_regimes.html).
+The data is embedded and the library loads from unpkg at a pinned version.
+The page has a crosshair legend (date, rate, return, regime), a marker at
+each regime start, and a regime table: click a row to zoom to that
+regime, double-click the chart to reset. GitHub does not render HTML in
+place, so download the file or open it from a clone.
+
+[![Interactive version](docs/fx_regimes_tv.png)](docs/fx_regimes.html)
+
+Lightweight Charts has no built-in background bands, so each regime is
+its own `AreaSeries` with value 1 on a hidden overlay price scale pinned
+to 0–1. A histogram would leave gaps between bars once ~3,000 days are
+squeezed into under one pixel each. Each band starts at the fixing
+*before* its first return, because a daily return covers the interval
+since the previous fixing; that way neighbouring bands meet. Both chart
+scripts read the tables through
+[`scripts/fx_regimes_db.py`](scripts/fx_regimes_db.py).
+
 ### Tests
 
 The calendar is the index, and it is checked against the data:
@@ -530,6 +552,7 @@ export CPT_EXTENSION_PATH=$PWD/duck-changepoint/build/release/cpt.duckdb_extensi
 
 dbt build --vars '{with_changepoint: true}' --select tag:changepoint
 uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
+uv run scripts/chart_fx_regimes_tv.py    # writes docs/fx_regimes.html
 ```
 
 CI builds `cpt` at a pinned commit (`CPT_REF` in
@@ -687,7 +710,9 @@ as plain `INT`, so consumers can read it without ever issuing a
 │   └── load_cpt.sql          # pre-hook: LOAD the cpt extension
 ├── scripts/
 │   ├── fetch_riksbank_fx.py  # refresh seeds/riksbank_sekeur.csv
-│   └── plot_fx_regimes.py    # docs/fx_regimes.png
+│   ├── fx_regimes_db.py      # reads the regime tables for both charts
+│   ├── plot_fx_regimes.py    # docs/fx_regimes.png (seaborn)
+│   └── chart_fx_regimes_tv.py  # docs/fx_regimes.html (Lightweight Charts)
 └── seeds/
     ├── dim_country.csv
     ├── exchange_holidays.csv

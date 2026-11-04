@@ -5,8 +5,8 @@
 # ///
 """Plot the SEK/EUR volatility regimes that the change point example built.
 
-Reads fct_trading_day_fx and fct_fx_regimes back out of SQL Server (through
-DuckDB's mssql extension, like scripts/db_init.py) and draws two panels:
+Reads fct_trading_day_fx and fct_fx_regimes back out of SQL Server (see
+fx_regimes_db.py) and draws two panels:
 
 * top:    the SEK/EUR fixing, each regime shaded by its annualised volatility
 * bottom: the daily log returns with each regime's +-2 sigma band
@@ -23,33 +23,13 @@ import os
 import sys
 from pathlib import Path
 
-import duckdb
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.colors import Normalize
 
-SERVER = "localhost,1433"
-SCHEMA = os.environ.get("DBT_SCHEMA", "main_azuredl")
+from fx_regimes_db import read_tables
+
 DEFAULT_OUT = Path(__file__).resolve().parent.parent / "docs" / "fx_regimes.png"
-
-
-def read_tables(password: str):
-    dsn = (
-        f"Server={SERVER};Database=Referensdata;UID=sa;PWD={password};"
-        "Encrypt=yes;TrustServerCertificate=yes"
-    )
-    con = duckdb.connect()
-    con.execute("INSTALL mssql FROM community")
-    con.execute("LOAD mssql")
-    con.execute(f"ATTACH '{dsn.replace(chr(39), chr(39) * 2)}' AS ref (TYPE mssql)")
-    days = con.execute(
-        f"SELECT date_day, sek_per_eur, log_return_pct FROM ref.{SCHEMA}.fct_trading_day_fx "
-        "WHERE has_fixing ORDER BY date_day"
-    ).df()
-    regimes = con.execute(
-        f"SELECT * FROM ref.{SCHEMA}.fct_fx_regimes ORDER BY regime_number"
-    ).df()
-    return days, regimes
 
 
 def plot(days, regimes, out: Path) -> None:
