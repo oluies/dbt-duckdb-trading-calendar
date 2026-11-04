@@ -35,23 +35,27 @@ final case class FxData(days: Vector[Day], regimes: Vector[Regime]):
   /** Index of a fixing day, for slicing the band of a regime. */
   def indexOf(date: String): Int = days.indexWhere(_.date == date)
 
-  def color(r: Regime): String =
+  /** Where the regime's volatility sits between the calmest (0) and the most volatile (1) regime. */
+  def intensity(r: Regime): Double =
     val lo = vols.headOption.getOrElse(0.0)
     val hi = vols.lastOption.getOrElse(0.0)
-    FxData.ramp(if hi > lo then (r.annualVolPct - lo) / (hi - lo) else 0.0)
+    if hi > lo then (r.annualVolPct - lo) / (hi - lo) else 0.0
+
+  /** The regime's colour on the palette's low -> high volatility ramp. */
+  def color(r: Regime, ramp: Vector[String]): String = FxData.ramp(ramp, intensity(r))
 
 object FxData:
 
-  /** Low -> high volatility: the palette of docs/fx_regimes.png ("flare"),
-    * ending in a brighter purple that stays visible on a dark background.
-    */
-  private val Ramp = Vector((0xed, 0xb0, 0x81), (0xd1, 0x4a, 0x61), (0x9a, 0x3a, 0xa8))
+  private def rgb(hex: String): (Int, Int, Int) =
+    val h = hex.stripPrefix("#")
+    (Integer.parseInt(h.substring(0, 2), 16), Integer.parseInt(h.substring(2, 4), 16), Integer.parseInt(h.substring(4, 6), 16))
 
-  def ramp(t: Double): String =
-    val x = math.min(math.max(t, 0.0), 1.0) * (Ramp.size - 1)
-    val i = math.min(x.toInt, Ramp.size - 2)
+  /** Linear interpolation along `stops` (hex colours) at t in [0, 1]. */
+  def ramp(stops: Vector[String], t: Double): String =
+    val x = math.min(math.max(t, 0.0), 1.0) * (stops.size - 1)
+    val i = math.min(x.toInt, stops.size - 2)
     val f = x - i
-    val ((r0, g0, b0), (r1, g1, b1)) = (Ramp(i), Ramp(i + 1))
+    val ((r0, g0, b0), (r1, g1, b1)) = (rgb(stops(i)), rgb(stops(i + 1)))
     def mix(a: Int, b: Int) = math.round(a + (b - a) * f).toInt
     f"#${mix(r0, r1)}%02x${mix(g0, g1)}%02x${mix(b0, b1)}%02x"
 

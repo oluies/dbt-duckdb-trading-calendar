@@ -8,8 +8,8 @@ import scala.scalajs.js.Dynamic.literal as obj
 /** The Lightweight Charts part of the page: rate over regime bands (pane 0),
   * returns with each regime's mean +- 2 sigma band (pane 1).
   *
-  * Colours come from the page's CSS tokens and are re-read whenever the
-  * theme changes (OS setting or a data-theme attribute on the root).
+  * Colours come from a [[Palette]]; `applyPalette` recolours everything when
+  * the reader changes the background or the theme changes.
   */
 final class RegimeChart(container: dom.HTMLElement, data: FxData, onHover: Option[String] => Unit):
   private val LC = LightweightCharts
@@ -67,8 +67,8 @@ final class RegimeChart(container: dom.HTMLElement, data: FxData, onHover: Optio
   private val withReturn = data.days.flatMap(d => d.ret.flatMap(ret => data.regimeOf(d.date).map(r => (d, ret, r))))
   returns.setData(withReturn.map((d, ret, _) => obj(time = d.date, value = ret): js.Object).toJSArray)
 
-  private def sigmaBand(sign: Int): Unit =
-    val series = chart.addSeries(
+  private def sigmaBand(): ISeriesApi =
+    chart.addSeries(
       LC.LineSeries,
       obj(
         lineWidth = 1,
@@ -79,11 +79,8 @@ final class RegimeChart(container: dom.HTMLElement, data: FxData, onHover: Optio
       ),
       1
     )
-    series.setData(withReturn.map { (d, _, r) =>
-      obj(time = d.date, value = r.meanPct + sign * 2 * r.dailyVolPct, color = data.color(r)): js.Object
-    }.toJSArray)
-  sigmaBand(+1)
-  sigmaBand(-1)
+  private val upper = sigmaBand()
+  private val lower = sigmaBand()
 
   private val markers = LC.createSeriesMarkers(rate, js.Array())
 
@@ -94,38 +91,32 @@ final class RegimeChart(container: dom.HTMLElement, data: FxData, onHover: Optio
 
   chart.subscribeCrosshairMove(p => onHover(p.time.toOption))
 
-  private def token(name: String): String =
-    dom.window.getComputedStyle(dom.document.documentElement).getPropertyValue(name).trim
-
   private def alpha(hex: String, a: Double): String = f"$hex${math.round(a * 255).toInt}%02x"
 
-  private val darkQuery = dom.window.matchMedia("(prefers-color-scheme: dark)")
-
-  private def isDark: Boolean =
-    dom.document.documentElement.getAttribute("data-theme") match
-      case "dark"  => true
-      case "light" => false
-      case _       => darkQuery.matches
-
-  def applyTheme(): Unit =
-    val line = token("--line")
+  def applyPalette(p: Palette): Unit =
     chart.applyOptions(
       obj(
-        layout = obj(background = obj(color = token("--bg")), textColor = token("--muted"), panes = obj(separatorColor = line)),
-        grid = obj(vertLines = obj(color = line), horzLines = obj(color = line)),
-        rightPriceScale = obj(borderColor = line),
-        timeScale = obj(borderColor = line)
+        layout = obj(background = obj(color = p.bg), textColor = p.muted, panes = obj(separatorColor = p.line)),
+        grid = obj(vertLines = obj(color = p.line), horzLines = obj(color = p.line)),
+        rightPriceScale = obj(borderColor = p.line),
+        timeScale = obj(borderColor = p.line)
       )
     )
-    val bandAlpha = if isDark then 0.4 else 0.28
     bands.lazyZip(data.regimes).foreach { (band, r) =>
-      val fill = alpha(data.color(r), bandAlpha)
+      // Stronger fills for more volatile regimes, so the stress periods stand out.
+      val fill = alpha(data.color(r, p.ramp), p.bandAlpha * (0.7 + 0.9 * data.intensity(r)))
       band.applyOptions(obj(topColor = fill, bottomColor = fill))
     }
-    rate.applyOptions(obj(color = token("--fg")))
-    returns.applyOptions(obj(color = alpha(token("--muted"), 0.8)))
-    // Stress labels above the line, the rest below, so a stress regime's
-    // label does not collide with the marker of the calm regime after it.
+    rate.applyOptions(obj(color = p.fg))
+    returns.applyOptions(obj(color = alpha(p.muted, 0.8)))
+    def sigma(sign: Int) = withReturn.map { (d, _, r) =>
+      obj(time = d.date, value = r.meanPct + sign * 2 * r.dailyVolPct, color = data.color(r, p.ramp)): js.Object
+    }.toJSArray
+    upper.setData(sigma(+1))
+    lower.setData(sigma(-1))
+    // Labels in the text colour: a regime's own colour on its band is too
+    // faint for 4.5:1. Stress regimes get an arrow and their volatility,
+    // above the line; the rest a dot below, so neighbouring labels part.
     markers.setMarkers(data.regimes.map { r =>
       val stress = data.isStress(r)
       obj(
@@ -133,19 +124,10 @@ final class RegimeChart(container: dom.HTMLElement, data: FxData, onHover: Optio
         position = if stress then "aboveBar" else "belowBar",
         shape = if stress then "arrowDown" else "circle",
         size = if stress then 1.2 else 0.6,
-        color = if stress then token("--fg") else data.color(r),
+        color = p.fg,
         text = if stress then f"R${r.n} ${r.annualVolPct}%.1f%% vol" else s"R${r.n}"
       ): js.Object
     }.toJSArray)
-
-  private val onSchemeChange: js.Function1[dom.Event, Unit] = _ => applyTheme()
-  private val themeObserver = new dom.MutationObserver((_, _) => applyTheme())
-  darkQuery.addEventListener("change", onSchemeChange)
-  themeObserver.observe(
-    dom.document.documentElement,
-    new dom.MutationObserverInit { attributes = true; attributeFilter = js.Array("data-theme") }
-  )
-  applyTheme()
 
   /** Zoom to a regime with a margin of 15% of its length (at least 10 days), or show everything. */
   def zoom(regime: Option[Regime]): Unit = regime match
@@ -159,7 +141,4 @@ final class RegimeChart(container: dom.HTMLElement, data: FxData, onHover: Optio
     t.setUTCDate(t.getUTCDate() + days)
     t.toISOString().take(10)
 
-  def dispose(): Unit =
-    darkQuery.removeEventListener("change", onSchemeChange)
-    themeObserver.disconnect()
-    chart.remove()
+  def dispose(): Unit = chart.remove()

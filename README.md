@@ -554,7 +554,15 @@ make serve                                 # http://localhost:8099
 builds it and deploys it to GitHub Pages,
 <https://oluies.github.io/dbt-duckdb-trading-calendar/>, on every push to
 `main` that touches `web/`. The `web` job in `ci.yml` builds the same site
-on every PR. The build
+on every PR, and runs [`scripts/check_contrast.py`](scripts/check_contrast.py), which checks
+every colour palette in `web/index.html` against WCAG 2.1 AA (text 4.5:1;
+chart lines, regime colours and focus rings 3:1).
+
+The page has a **Background** picker (Auto, White, Light grey, Dark grey,
+Black). Auto follows the host's `data-theme`, then the OS setting; a choice
+is remembered in the browser. The regime table is keyboard operable (each
+regime is a button), **Show all** resets the zoom, and the chart carries a
+text alternative that points to the table. The build
 uses Scala 3.3 LTS, Scala.js 1.22 and Laminar 17.2, with Mill 1.3 through
 the `web/mill` launcher, so only a JDK is needed.
 

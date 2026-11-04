@@ -25,25 +25,56 @@ object Explainer:
       cls := "explainer",
       h2("How the regimes are found"),
       p(
-        "The page shows the output of three dbt models. Each step below gives the query (simplified from the model) ",
-        "and what its parameters mean."
+        "The page shows the output of a fetch script and three dbt models. Each step below gives the query (simplified from the model ",
+        "or script) and what its parameters mean."
       ),
       step(
-        "1. Daily returns",
+        "1. Getting the data",
+        "scripts/fetch_riksbank_fx.py",
+        s"""-- The API answers DuckDB's HEAD probe with 404; a plain GET works.
+SET force_download = true;
+
+COPY (
+    SELECT date::DATE             AS rate_date,
+           value::DECIMAL(10, 4)  AS sek_per_eur
+    FROM read_json('https://api.riksbank.se/swea/v1/Observations/SEKEURPMI/2015-01-01/${fx.days.last.date}')
+    ORDER BY rate_date
+) TO 'seeds/riksbank_sekeur.csv' (HEADER)""",
+        div(
+          p(
+            "The series comes from the Riksbank's open data API, SWEA, which needs no key. Series SEKEURPMI is the ",
+            "daily SEK/EUR fixing, published on Swedish banking days. DuckDB reads the JSON response over HTTPS with ",
+            code("read_json"), " and writes it to a CSV file."
+          ),
+          p(
+            "That CSV is a dbt seed, a frozen copy committed to the repository, so builds and CI never call the ",
+            "rate-limited API. From there the data flows:"
+          ),
+          ol(
+            li("the fetch script writes ", code("seeds/riksbank_sekeur.csv"), ";"),
+            li(code("dbt seed"), " loads it, and ", code("dbt build --vars '{with_changepoint: true}'"),
+              " runs the three models below into SQL Server;"),
+            li(code("scripts/export_fx_regimes_json.py"), " reads the results back and writes ", code("fx_regimes.json"), ";"),
+            li("this page fetches that file when it loads.")
+          ),
+          p(f"The copy on this page ends on ${fx.days.last.date}, with ${fx.days.size}%,d fixings.")
+        )
+      ),
+      step(
+        "2. Daily returns",
         "models/changepoint/stg_riksbank_fx.sql",
         """select rate_date,
        sek_per_eur,
        100 * ln(sek_per_eur / lag(sek_per_eur) over (order by rate_date)) as log_return_pct
 from riksbank_sekeur""",
         p(
-          "The input is the Riksbank's daily SEK/EUR fixing (series SEKEURPMI), published on Swedish banking days. ",
           "The exchange rate itself drifts, so the detector works on the log return between consecutive fixings, ",
           "in percent. A return of +0.50 means the krona weakened by about half a percent against the euro since ",
           f"the previous fixing. That gives N = $n%,d returns from ${fx.days(1).date} to ${fx.days.last.date}."
         )
       ),
       step(
-        "2. Trading-day index",
+        "3. Trading-day index",
         "models/changepoint/fct_trading_day_fx.sql",
         """select d.date_day,
        coalesce(x.is_trading_day, true) as is_xsto_trading_day,  -- NULL in years the calendar does not cover
@@ -59,7 +90,7 @@ where not d.is_weekend""",
         )
       ),
       step(
-        "3. Change point detection",
+        "4. Change point detection",
         "models/changepoint/fct_fx_regimes.sql",
         s"""with series as (
     select list(log_return_pct order by date_day) as xs,
@@ -143,7 +174,7 @@ from (select days, unnest(cpt_segment_stats(xs, cpt_pelt(xs, 'normal', 'mbic', $
       h3(title),
       body,
       pre(code(sql)),
-      p(cls := "source", "Model: ", a(href := Repo + model, model))
+      p(cls := "source", "Source: ", a(href := Repo + model, model))
     )
 
   private def term(mods: Modifier[HtmlElement]*): HtmlElement = dt(mods)
