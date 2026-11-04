@@ -59,10 +59,13 @@ FROM duckdb_extensions()
 WHERE extension_name IN ('httpfs', 'azure', 'mssql');
 ```
 
-> The `mssql` extension is still pinned single-threaded in
-> `profiles.yml` (`threads: 1`); the thread-safety fix lands in v0.2.1
-> once it reaches the DuckDB community repo. See the `threads` comment
-> in `profiles.yml`.
+> The `dev` profile runs with `threads: 4`. The community `mssql`
+> extension is thread-safe since its "Thread-safe catalog entry
+> lifetime" fix (hugr-lab/mssql-extension PR #127); on DuckDB 2.0.0,
+> `INSTALL mssql FROM community` resolves to v0.3.0, which includes it.
+> Builds up to v0.2.0 crashed intermittently (exit 139) at two or more
+> threads; if that comes back, drop to `threads: 1`. See the `threads`
+> comment in `profiles.yml`.
 
 ---
 
