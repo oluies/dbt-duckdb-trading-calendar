@@ -79,13 +79,19 @@ PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SEK/EUR volatility regimes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
+  /* Light by default; dark follows the OS unless the page's host sets
+     data-theme on the root, which wins either way. */
   :root { --bg: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea; --row: #f5f5f7; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #131316; --fg: #ececf0; --muted: #9a9aa2; --line: #2c2c31; --row: #1d1d22; }
+    :root:not([data-theme="light"]) { --bg: #131316; --fg: #ececf0; --muted: #9a9aa2; --line: #2c2c31; --row: #1d1d22; color-scheme: dark; }
   }
+  :root[data-theme="dark"] { --bg: #131316; --fg: #ececf0; --muted: #9a9aa2; --line: #2c2c31; --row: #1d1d22; color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+  body { margin: 0; padding-block: 16px; background: var(--bg); color: var(--fg);
+         padding-left: max(16px, env(safe-area-inset-left, 0px));
+         padding-right: max(16px, env(safe-area-inset-right, 0px));
          font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 1200px; margin: 0 auto; }
   h1 { font-size: 18px; margin: 0 0 4px; }
@@ -133,14 +139,16 @@ const LC = LightweightCharts;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const alpha = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, '0');
 
+const isDark = () => {
+  const t = document.documentElement.dataset.theme;
+  return t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+};
+
 const chart = LC.createChart(document.getElementById('chart'), {
   autoSize: true,
-  layout: { background: { color: css('--bg') }, textColor: css('--muted'), fontSize: 12,
-            panes: { separatorColor: css('--line') } },
-  grid: { vertLines: { color: css('--line') }, horzLines: { color: css('--line') } },
-  rightPriceScale: { borderColor: css('--line') },
+  layout: { fontSize: 12 },
   // ~3000 daily points: allow sub-pixel bars so fitContent shows them all.
-  timeScale: { borderColor: css('--line'), minBarSpacing: 0.05, fixLeftEdge: true, fixRightEdge: true },
+  timeScale: { minBarSpacing: 0.05, fixLeftEdge: true, fixRightEdge: true },
   crosshair: { mode: LC.CrosshairMode.Normal },
 });
 
@@ -150,11 +158,9 @@ const regimeOf = t => DATA.regimes.find(r => t >= r.start && t <= r.end);
 
 // Pane 0: one full-height area per regime on a hidden overlay scale (a
 // histogram would leave gaps between sub-pixel bars), then the rate.
-const bandAlpha = matchMedia('(prefers-color-scheme: dark)').matches ? 0.4 : 0.28;
-for (const r of DATA.regimes) {
-  const fill = alpha(r.color, bandAlpha);
+const bands = DATA.regimes.map(r => {
   const band = chart.addSeries(LC.AreaSeries, {
-    priceScaleId: 'bands', lineVisible: false, topColor: fill, bottomColor: fill,
+    priceScaleId: 'bands', lineVisible: false,
     lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
     autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }),
   });
@@ -163,16 +169,16 @@ for (const r of DATA.regimes) {
   const from = Math.max(0, DATA.days.findIndex(d => d[0] === r.start) - 1);
   const to = DATA.days.findIndex(d => d[0] === r.end);
   band.setData(DATA.days.slice(from, to + 1).map(d => ({ time: d[0], value: 1 })));
-}
+  return band;
+});
 chart.priceScale('bands').applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
 const rate = chart.addSeries(LC.LineSeries, {
-  color: css('--fg'), lineWidth: 1, priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
+  lineWidth: 1, priceFormat: { type: 'price', precision: 4, minMove: 0.0001 },
   title: 'SEK/EUR',
 });
 
 // Pane 1: returns and the regime mean +- 2 sigma band.
 const returns = chart.addSeries(LC.HistogramSeries, {
-  color: alpha(css('--muted').startsWith('#') ? css('--muted') : '#6e6e73', 0.8),
   priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
   lastValueVisible: false, priceLineVisible: false, title: 'log return %',
 }, 1);
@@ -195,12 +201,35 @@ returns.setData(retData);
 upper.setData(upData);
 lower.setData(loData);
 
-LC.createSeriesMarkers(rate, DATA.regimes.map(r => ({
-  // Stress labels above the line, the rest below, so a stress regime's label
-  // does not collide with the marker of the calm regime right after it.
-  time: r.start, position: r.stress ? 'aboveBar' : 'belowBar', shape: r.stress ? 'arrowDown' : 'circle', size: r.stress ? 1.2 : 0.6,
-  color: r.stress ? css('--fg') : r.color, text: r.stress ? `R${r.n} ${r.vol.toFixed(1)}% vol` : `R${r.n}`,
-})));
+const markers = LC.createSeriesMarkers(rate, []);
+
+// Everything that takes a theme colour, re-read from the CSS tokens so the
+// chart follows a theme switch without a reload.
+function applyTheme() {
+  const line = css('--line');
+  chart.applyOptions({
+    layout: { background: { color: css('--bg') }, textColor: css('--muted'), panes: { separatorColor: line } },
+    grid: { vertLines: { color: line }, horzLines: { color: line } },
+    rightPriceScale: { borderColor: line },
+    timeScale: { borderColor: line },
+  });
+  const bandAlpha = isDark() ? 0.4 : 0.28;
+  bands.forEach((band, i) => {
+    const fill = alpha(DATA.regimes[i].color, bandAlpha);
+    band.applyOptions({ topColor: fill, bottomColor: fill });
+  });
+  rate.applyOptions({ color: css('--fg') });
+  returns.applyOptions({ color: alpha(css('--muted'), 0.8) });
+  markers.setMarkers(DATA.regimes.map(r => ({
+    // Stress labels above the line, the rest below, so a stress regime's label
+    // does not collide with the marker of the calm regime right after it.
+    time: r.start, position: r.stress ? 'aboveBar' : 'belowBar', shape: r.stress ? 'arrowDown' : 'circle', size: r.stress ? 1.2 : 0.6,
+    color: r.stress ? css('--fg') : r.color, text: r.stress ? `R${r.n} ${r.vol.toFixed(1)}% vol` : `R${r.n}`,
+  })));
+}
+applyTheme();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
 const panes = chart.panes();
 // Relative sizes: a fixed setHeight() can push the time axis out of view.
