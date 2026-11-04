@@ -28,9 +28,9 @@ work on a market series. It splits the SEK/EUR exchange rate into
 volatility regimes with the [`cpt`](https://github.com/hugr-lab/duck-changepoint)
 DuckDB extension, indexed on Nasdaq Stockholm trading days. See
 [Change point example](#change-point-example-with_changepoint) for the
-models, a walkthrough of the code and how to run it. An interactive
-version, drawn with TradingView Lightweight Charts, is in
-[`docs/fx_regimes.html`](docs/fx_regimes.html).
+models, a walkthrough of the code and how to run it. The interactive
+version (Scala.js + Laminar over TradingView Lightweight Charts) is live
+at **<https://oluies.github.io/dbt-duckdb-trading-calendar/>**.
 
 [![SEK/EUR volatility regimes](docs/fx_regimes.png)](#change-point-example-with_changepoint)
 
@@ -547,7 +547,11 @@ make serve                                 # http://localhost:8099
 ```
 
 `web/dist/` is a static site (`index.html`, `main.js`,
-`fx_regimes.json`), ready for GitHub Pages or any static host. The build
+`fx_regimes.json`). [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
+builds it and deploys it to GitHub Pages,
+<https://oluies.github.io/dbt-duckdb-trading-calendar/>, on every push to
+`main` that touches `web/`. The `web` job in `ci.yml` builds the same site
+on every PR. The build
 uses Scala 3.3 LTS, Scala.js 1.22 and Laminar 17.2, with Mill 1.3 through
 the `web/mill` launcher, so only a JDK is needed.
 
