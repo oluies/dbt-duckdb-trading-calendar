@@ -523,6 +523,34 @@ since the previous fixing; that way neighbouring bands meet. Both chart
 scripts read the tables through
 [`scripts/fx_regimes_db.py`](scripts/fx_regimes_db.py).
 
+**7. Scala.js + Laminar app** ([`web/`](web/)).
+The same chart as a [Scala.js](https://www.scala-js.org/) application
+with a [Laminar](https://laminar.dev) UI, over Lightweight Charts. It
+loads the regimes from `fx_regimes.json`, so it can be redeployed with
+fresh data without recompiling.
+
+| File | What it holds |
+| --- | --- |
+| [`LightweightCharts.scala`](web/app/src/LightweightCharts.scala) | A typed facade for the few Lightweight Charts calls the app makes (`@JSGlobal("LightweightCharts")`, the standalone build `index.html` loads) |
+| [`Model.scala`](web/app/src/Model.scala) | `Day`, `Regime`, `FxData`: JSON parsing, the stress rule (≥ 2× the median volatility, as in the dbt test) and the volatility colour ramp |
+| [`RegimeChart.scala`](web/app/src/RegimeChart.scala) | The chart: regime bands, rate, returns with the ±2σ band, markers. Colours are re-read from the page's CSS tokens when the theme changes, and the listeners are removed on unmount |
+| [`Main.scala`](web/app/src/Main.scala) | The Laminar view: `FetchStream` loads the data into a `Signal`; the legend follows a `Var` fed by the crosshair; clicking a table row sets the selected regime, and the chart zooms to it |
+
+The chart is mounted with `onMountUnmountCallbackWithState`, so the
+Lightweight Charts instance lives exactly as long as its DOM node, and
+the zoom subscription uses the element's owner.
+
+```bash
+uv run scripts/export_fx_regimes_json.py   # web/public/fx_regimes.json
+cd web && make dist                        # Mill links main.js; site in web/dist/
+make serve                                 # http://localhost:8099
+```
+
+`web/dist/` is a static site (`index.html`, `main.js`,
+`fx_regimes.json`), ready for GitHub Pages or any static host. The build
+uses Scala 3.3 LTS, Scala.js 1.22 and Laminar 17.2, with Mill 1.3 through
+the `web/mill` launcher, so only a JDK is needed.
+
 ### Tests
 
 The calendar is the index, and it is checked against the data:
@@ -712,7 +740,9 @@ as plain `INT`, so consumers can read it without ever issuing a
 │   ├── fetch_riksbank_fx.py  # refresh seeds/riksbank_sekeur.csv
 │   ├── fx_regimes_db.py      # reads the regime tables for both charts
 │   ├── plot_fx_regimes.py    # docs/fx_regimes.png (seaborn)
-│   └── chart_fx_regimes_tv.py  # docs/fx_regimes.html (Lightweight Charts)
+│   ├── chart_fx_regimes_tv.py  # docs/fx_regimes.html (Lightweight Charts)
+│   └── export_fx_regimes_json.py  # web/public/fx_regimes.json
+├── web/                      # Scala.js + Laminar version of the chart (Mill)
 └── seeds/
     ├── dim_country.csv
     ├── exchange_holidays.csv
