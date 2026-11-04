@@ -23,6 +23,17 @@ directly from blob storage and writes the resulting tables into a
 SQL Server database (`Referensdata.azuredl`) over the DuckDB **mssql**
 extension's `ATTACH`.
 
+**Change point example.** An optional set of models puts the calendar to
+work on a market series. It splits the SEK/EUR exchange rate into
+volatility regimes with the [`cpt`](https://github.com/hugr-lab/duck-changepoint)
+DuckDB extension, indexed on Nasdaq Stockholm trading days. See
+[Change point example](#change-point-example-with_changepoint) for the
+models, a walkthrough of the code and how to run it. The interactive
+version (Scala.js + Laminar over TradingView Lightweight Charts) is live
+at **<https://oluies.github.io/dbt-duckdb-trading-calendar/>**.
+
+[![SEK/EUR volatility regimes](docs/fx_regimes.png)](#change-point-example-with_changepoint)
+
 ### DuckDB extensions
 
 The three `ext:` badges above track the extensions this project loads
@@ -379,6 +390,205 @@ seasonality cleanly — they are not changepoints themselves.
   `accepted_values` on `holiday_type`
 - `fct_exchange_calendar` – unique combination `(calendar_date,
   exchange_code)`; relationships on `date_key` and `country_code`
+- The change point models carry their own tests in
+  `models/changepoint/schema.yml` and `tests/assert_fx_*.sql`; they run
+  only with `with_changepoint: true` (see below).
+
+## Change point example (`with_changepoint`)
+
+An optional example that puts the calendar to work on a market series:
+it finds **volatility regimes in the SEK/EUR exchange rate** with the
+[`cpt`](https://github.com/hugr-lab/duck-changepoint) DuckDB extension
+(PELT change point detection), indexed on Nasdaq Stockholm trading days.
+
+![SEK/EUR volatility regimes](docs/fx_regimes.png)
+
+The input is the Riksbank's daily SEK/EUR fixing (SWEA series
+`SEKEURPMI`), frozen in `seeds/riksbank_sekeur.csv` so CI never calls the
+rate-limited API. `scripts/fetch_riksbank_fx.py` refreshes it.
+
+| Model | Grain | What it does |
+| --- | --- | --- |
+| `stg_riksbank_fx` | fixing day | rate + log return vs. the previous fixing |
+| `fct_trading_day_fx` | weekday | joins `dim_date`, the XSTO calendar and the fixing |
+| `fct_fx_regimes` | regime | start/end date, trading days, mean return, daily and annualised volatility |
+
+```mermaid
+flowchart LR
+    seed[(riksbank_sekeur)] --> stg[stg_riksbank_fx]
+    dim[dim_date] --> tdf[fct_trading_day_fx]
+    xsto[fct_exchange_calendar] --> tdf
+    stg --> tdf --> reg[fct_fx_regimes]
+    cpt{{cpt extension}} -.-> reg
+```
+
+### How the code works
+
+**1. Returns** ([`stg_riksbank_fx.sql`](models/changepoint/stg_riksbank_fx.sql)).
+Change point detection wants a series whose behaviour is roughly
+constant within a regime. The rate itself wanders, but its daily log
+return does not, so the model takes the return against the previous
+*fixing* (not the previous calendar day):
+
+```sql
+100 * ln(sek_per_eur / lag(sek_per_eur) over (order by rate_date)) as log_return_pct
+```
+
+**2. Calendar join** ([`fct_trading_day_fx.sql`](models/changepoint/fct_trading_day_fx.sql)).
+One row per weekday from `dim_date`, left-joined to the XSTO exception
+days and the fixing. The exchange seed lists exceptions only, so a
+weekday with no row is a trading day, but only in years the seed covers.
+Elsewhere `is_xsto_trading_day` is NULL rather than a misleading `true`:
+
+```sql
+case
+    when cy.year_number is null then null          -- year not in the seed
+    else coalesce(x.is_trading_day, true)          -- no exception row = open
+end as is_xsto_trading_day
+```
+
+**3. Detection** ([`fct_fx_regimes.sql`](models/changepoint/fct_fx_regimes.sql)).
+`cpt` works on a whole series at once, so the returns are collected into
+a `DOUBLE[]` in date order, together with a parallel list of dates.
+`cpt_pelt` returns the 1-based positions where segments end;
+`cpt_segment_stats` turns those into one struct per segment (start, end,
+mean, sample variance, length); `unnest` makes it one row per regime;
+and indexing the date list maps positions back to calendar dates
+(simplified; the model reads the penalty and minimum length from vars):
+
+```sql
+with series as (
+    select list(log_return_pct order by date_day) as xs,
+           list(date_day       order by date_day) as days
+    from returns
+),
+segments as (
+    select days,
+           unnest(cpt_segment_stats(xs, cpt_pelt(xs, 'normal', 'mbic', 20))) as seg
+    from series
+)
+select days[seg.start] as start_date,
+       days[seg."end"] as end_date,
+       seg.n           as trading_days,
+       sqrt(seg.var * 252) as annualised_vol_pct
+from segments
+```
+
+The `normal` cost detects changes in mean *and* variance. FX returns keep
+a mean near zero, so what it finds are volatility shifts: COVID in spring
+2020 (13.6 % annualised) and the April 2025 tariff shock (14.0 %),
+against 4–7 % in calm regimes. The penalty sets how much a new break
+must improve the fit before it is kept: `cpt_penalty` defaults to `mbic`
+(R changepoint's convention; `bic`, `aic` or a number also work), and
+`cpt_min_regime_days` (default 20) stops one wild week from becoming a
+regime of its own. Raise either and fewer regimes survive.
+
+Lists and structs never leave DuckDB: the query computes everything,
+then only scalar columns are written to SQL Server, so the table
+materialises in `Referensdata` like the rest of the project.
+
+**4. Loading the extension** ([`macros/load_cpt.sql`](macros/load_cpt.sql), `profiles.yml`).
+`fct_fx_regimes` has a pre-hook, `{{ load_cpt() }}`, that runs
+`LOAD '<CPT_EXTENSION_PATH>'` and stops with a clear error if the
+variable is unset. The path is read inside a macro because dbt evaluates
+`env_var()` in `dbt_project.yml` at parse time, which would break every
+run without it. `cpt` ships unsigned and `allow_unsigned_extensions` can
+only be set when DuckDB starts, so `profiles.yml` passes it in
+`config_options`, switched on only when `CPT_EXTENSION_PATH` is set.
+
+**5. Chart** ([`scripts/plot_fx_regimes.py`](scripts/plot_fx_regimes.py)).
+It reads `fct_trading_day_fx` and `fct_fx_regimes` back from SQL Server
+through DuckDB's `mssql` extension and draws the figure above with
+seaborn. The top panel shows the rate with each regime shaded by
+volatility, and the bottom panel shows the returns with each regime's
+mean ± 2σ band.
+
+**6. Interactive chart** ([`scripts/chart_fx_regimes_tv.py`](scripts/chart_fx_regimes_tv.py)).
+The same data drawn with [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/)
+(Apache-2.0) into one self-contained page, [`docs/fx_regimes.html`](docs/fx_regimes.html).
+The data is embedded and the library loads from unpkg at a pinned version.
+The page has a crosshair legend (date, rate, return, regime), a marker at
+each regime start, and a regime table: click a row to zoom to that
+regime, double-click the chart to reset. GitHub does not render HTML in
+place, so download the file or open it from a clone.
+
+[![Interactive version](docs/fx_regimes_tv.png)](docs/fx_regimes.html)
+
+Lightweight Charts has no built-in background bands, so each regime is
+its own `AreaSeries` with value 1 on a hidden overlay price scale pinned
+to 0–1. A histogram would leave gaps between bars once ~3,000 days are
+squeezed into under one pixel each. Each band starts at the fixing
+*before* its first return, because a daily return covers the interval
+since the previous fixing; that way neighbouring bands meet. Both chart
+scripts read the tables through
+[`scripts/fx_regimes_db.py`](scripts/fx_regimes_db.py).
+
+**7. Scala.js + Laminar app** ([`web/`](web/)).
+The same chart as a [Scala.js](https://www.scala-js.org/) application
+with a [Laminar](https://laminar.dev) UI, over Lightweight Charts. It
+loads the regimes from `fx_regimes.json`, so it can be redeployed with
+fresh data without recompiling.
+
+| File | What it holds |
+| --- | --- |
+| [`LightweightCharts.scala`](web/app/src/LightweightCharts.scala) | A typed facade for the few Lightweight Charts calls the app makes (`@JSGlobal("LightweightCharts")`, the standalone build `index.html` loads) |
+| [`Model.scala`](web/app/src/Model.scala) | `Day`, `Regime`, `FxData`: JSON parsing, the stress rule (≥ 2× the median volatility, as in the dbt test) and the volatility colour ramp |
+| [`RegimeChart.scala`](web/app/src/RegimeChart.scala) | The chart: regime bands, rate, returns with the ±2σ band, markers. Colours are re-read from the page's CSS tokens when the theme changes, and the listeners are removed on unmount |
+| [`Main.scala`](web/app/src/Main.scala) | The Laminar view: `FetchStream` loads the data into a `Signal`; the legend follows a `Var` fed by the crosshair; clicking a table row sets the selected regime, and the chart zooms to it |
+
+The chart is mounted with `onMountUnmountCallbackWithState`, so the
+Lightweight Charts instance lives exactly as long as its DOM node, and
+the zoom subscription uses the element's owner.
+
+```bash
+uv run scripts/export_fx_regimes_json.py   # web/public/fx_regimes.json
+cd web && make dist                        # Mill links main.js; site in web/dist/
+make serve                                 # http://localhost:8099
+```
+
+`web/dist/` is a static site (`index.html`, `main.js`,
+`fx_regimes.json`). [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
+builds it and deploys it to GitHub Pages,
+<https://oluies.github.io/dbt-duckdb-trading-calendar/>, on every push to
+`main` that touches `web/`. The `web` job in `ci.yml` builds the same site
+on every PR. The build
+uses Scala 3.3 LTS, Scala.js 1.22 and Laminar 17.2, with Mill 1.3 through
+the `web/mill` launcher, so only a JDK is needed.
+
+### Tests
+
+The calendar is the index, and it is checked against the data:
+[`tests/assert_fx_fixings_match_xsto_calendar.sql`](tests/assert_fx_fixings_match_xsto_calendar.sql) asserts that, in years
+the exchange seed covers, the Riksbank publishes on exactly the XSTO
+trading days. That test caught New Year's Eve, which the seed listed as
+a half-day session; Nasdaq Stockholm is closed on 31 December. Two more
+tests check that the regimes tile the return series
+([`assert_fx_regimes_tile_series.sql`](tests/assert_fx_regimes_tile_series.sql)),
+and that the 2020 and 2025 stress dates fall in regimes with at least
+twice the median volatility
+([`assert_fx_stress_dates_in_high_vol_regimes.sql`](tests/assert_fx_stress_dates_in_high_vol_regimes.sql)).
+The second fails if the penalty is set so high that the stress episodes
+merge into calm regimes.
+
+### Running it
+
+`cpt` is not in a DuckDB extension repository yet, so
+build it and point `CPT_EXTENSION_PATH` at the binary. When that variable
+is set, `profiles.yml` enables `allow_unsigned_extensions`; otherwise
+signature checks stay on.
+
+```bash
+git clone --recursive https://github.com/hugr-lab/duck-changepoint
+(cd duck-changepoint && make configure && make release)
+export CPT_EXTENSION_PATH=$PWD/duck-changepoint/build/release/cpt.duckdb_extension
+
+dbt build --vars '{with_changepoint: true}' --select tag:changepoint
+uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
+uv run scripts/chart_fx_regimes_tv.py    # writes docs/fx_regimes.html
+```
+
+CI builds `cpt` at a pinned commit (`CPT_REF` in
+`.github/workflows/ci.yml`) and runs these models after the main build.
 
 ---
 
@@ -519,11 +729,26 @@ as plain `INT`, so consumers can read it without ever issuing a
 │   ├── staging/
 │   │   ├── stg_public_holidays.sql
 │   │   └── stg_date_spine.sql
-│   └── marts/
-│       ├── dim_date.sql
-│       ├── fct_holiday_calendar.sql
-│       └── fct_exchange_calendar.sql
+│   ├── marts/
+│   │   ├── dim_date.sql
+│   │   ├── fct_holiday_calendar.sql
+│   │   └── fct_exchange_calendar.sql
+│   └── changepoint/          # with_changepoint: SEK/EUR volatility regimes
+│       ├── schema.yml
+│       ├── stg_riksbank_fx.sql
+│       ├── fct_trading_day_fx.sql
+│       └── fct_fx_regimes.sql
+├── macros/
+│   └── load_cpt.sql          # pre-hook: LOAD the cpt extension
+├── scripts/
+│   ├── fetch_riksbank_fx.py  # refresh seeds/riksbank_sekeur.csv
+│   ├── fx_regimes_db.py      # reads the regime tables for both charts
+│   ├── plot_fx_regimes.py    # docs/fx_regimes.png (seaborn)
+│   ├── chart_fx_regimes_tv.py  # docs/fx_regimes.html (Lightweight Charts)
+│   └── export_fx_regimes_json.py  # web/public/fx_regimes.json
+├── web/                      # Scala.js + Laminar version of the chart (Mill)
 └── seeds/
     ├── dim_country.csv
-    └── exchange_holidays.csv
+    ├── exchange_holidays.csv
+    └── riksbank_sekeur.csv
 ```

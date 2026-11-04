@@ -27,3 +27,7 @@ venv/
 
 # Local Claude Code session state
 .claude/
+
+# Scala.js app (web/): Mill output and the assembled site
+web/out/
+web/dist/

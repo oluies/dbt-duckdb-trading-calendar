@@ -1,0 +1,105 @@
+version: 2
+
+# Change point example. Enabled only with --vars '{with_changepoint: true}'
+# and CPT_EXTENSION_PATH set; see dbt_project.yml and README.
+
+models:
+
+  - name: stg_riksbank_fx
+    description: >
+      Riksbank daily SEK/EUR fixing (series SEKEURPMI) with the log return
+      against the previous fixing, in percent. Source: Sveriges Riksbank.
+    columns:
+      - name: rate_date
+        tests:
+          - unique
+          - not_null
+      - name: sek_per_eur
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+  - name: fct_trading_day_fx
+    description: >
+      One row per weekday across the FX series, joined to the Nasdaq
+      Stockholm (XSTO) exception calendar and the Riksbank fixing. The
+      return series that fct_fx_regimes segments is the rows with a
+      log_return_pct, i.e. the fixing days.
+    columns:
+      - name: date_day
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+      - name: is_xsto_trading_day
+        description: >
+          True if Nasdaq Stockholm trades that day, false on a full
+          closure. NULL in years the exchange_holidays seed does not cover.
+      - name: has_fixing
+        description: True if the Riksbank published a SEK/EUR fixing that day.
+        tests:
+          - not_null
+      - name: log_return_pct
+        description: 100 * ln(rate / previous fixing). NULL on non-fixing days and the first fixing.
+
+  - name: fct_fx_regimes
+    description: >
+      SEK/EUR volatility regimes. One row per segment that PELT (cost
+      'normal': change in mean and variance) finds in the daily log
+      returns, with var('cpt_penalty') and at least
+      var('cpt_min_regime_days') trading days per regime. Built with the
+      cpt DuckDB extension.
+    columns:
+      - name: regime_number
+        description: 1-based, in date order.
+        tests:
+          - unique
+          - not_null
+      - name: start_date
+        description: First fixing day whose return belongs to the regime.
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+      - name: end_date
+        description: Last fixing day of the regime.
+        tests:
+          - unique
+          - not_null
+      - name: trading_days
+        description: Number of daily returns in the regime.
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= {{ var('cpt_min_regime_days') }}"
+      - name: mean_log_return_pct
+        description: Mean daily log return, percent.
+      - name: daily_vol_pct
+        description: Sample standard deviation of the daily log return, percent.
+      - name: annualised_vol_pct
+        description: daily_vol_pct * sqrt(252).
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: "> 0"
+
+seeds:
+
+  - name: riksbank_sekeur
+    description: >
+      Frozen copy of the Riksbank SWEA series SEKEURPMI (SEK per EUR, daily
+      fixing), 2015 onward. Refresh with scripts/fetch_riksbank_fx.py.
+      Source: Sveriges Riksbank, https://www.riksbank.se/en-gb/statistics/
+    columns:
+      - name: rate_date
+        tests:
+          - unique
+          - not_null
+      - name: sek_per_eur
+        tests:
+          - not_null

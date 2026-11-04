@@ -1,0 +1,66 @@
+name: Pages
+
+# Builds the Scala.js + Laminar regime chart (web/) and deploys web/dist/
+# to GitHub Pages. The data is the committed web/public/fx_regimes.json
+# (refresh with scripts/export_fx_regimes_json.py), so this needs no SQL
+# Server. Runs on pushes to main that touch the app, or by hand.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let an in-progress one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build web/dist
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Mill and Coursier
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/mill
+            ~/.cache/coursier
+          key: mill-${{ runner.os }}-${{ hashFiles('web/build.mill', 'web/mill') }}
+
+      - name: Link Scala.js and assemble the site
+        working-directory: web
+        run: make dist
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
