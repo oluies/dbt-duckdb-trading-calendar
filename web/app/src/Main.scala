@@ -55,7 +55,8 @@ object App:
         ),
         onDblClick.mapTo(None) --> selected
       ),
-      div(cls := "wrap", regimeTable(fx, selected))
+      div(cls := "wrap", regimeTable(fx, selected)),
+      Explainer.view(fx)
     )
 
   private def legend(fx: FxData, d: Day): HtmlElement =
