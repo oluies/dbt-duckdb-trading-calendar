@@ -18,6 +18,10 @@ env:
   SA_PASSWORD: CI_Str0ng_P@ssword_2026!
   AZURE_CA_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
   DBT_PROFILES_DIR: ${{ github.workspace }}
+  # cpt (change point detection) DuckDB extension, built from source for
+  # the change point example. Pinned to a commit; bump deliberately.
+  CPT_REPO: hugr-lab/duck-changepoint
+  CPT_REF: ffbc29e77b64df72be42492a5c9f03119e70d57d
 
 jobs:
   build:
@@ -62,6 +66,34 @@ jobs:
 
       - name: dbt test
         run: dbt test
+
+      # Change point example (models/changepoint/). cpt is not in a DuckDB
+      # extension repo, so build it from source, cached per pinned commit.
+      - name: Check out cpt extension source
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.CPT_REPO }}
+          ref: ${{ env.CPT_REF }}
+          path: duck-changepoint
+          submodules: recursive
+
+      - name: Cache cpt build
+        id: cpt-cache
+        uses: actions/cache@v6
+        with:
+          path: duck-changepoint/build/release/cpt.duckdb_extension
+          key: cpt-${{ runner.os }}-${{ env.CPT_REF }}
+
+      - name: Build cpt extension
+        if: steps.cpt-cache.outputs.cache-hit != 'true'
+        working-directory: duck-changepoint
+        run: make configure && make release
+
+      - name: dbt build (change point example)
+        env:
+          CPT_EXTENSION_PATH: ${{ github.workspace }}/duck-changepoint/build/release/cpt.duckdb_extension
+        run: |
+          dbt build --vars '{with_changepoint: true}' --select tag:changepoint
 
       - name: Dump SQL Server logs on failure
         if: failure()

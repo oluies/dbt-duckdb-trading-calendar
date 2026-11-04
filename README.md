@@ -379,6 +379,63 @@ seasonality cleanly — they are not changepoints themselves.
   `accepted_values` on `holiday_type`
 - `fct_exchange_calendar` – unique combination `(calendar_date,
   exchange_code)`; relationships on `date_key` and `country_code`
+- The change point models carry their own tests in
+  `models/changepoint/schema.yml` and `tests/assert_fx_*.sql`; they run
+  only with `with_changepoint: true` (see below).
+
+## Change point example (`with_changepoint`)
+
+An optional example that puts the calendar to work on a market series:
+it finds **volatility regimes in the SEK/EUR exchange rate** with the
+[`cpt`](https://github.com/hugr-lab/duck-changepoint) DuckDB extension
+(PELT change point detection), indexed on Nasdaq Stockholm trading days.
+
+![SEK/EUR volatility regimes](docs/fx_regimes.png)
+
+The input is the Riksbank's daily SEK/EUR fixing (SWEA series
+`SEKEURPMI`), frozen in `seeds/riksbank_sekeur.csv` so CI never calls the
+rate-limited API. `scripts/fetch_riksbank_fx.py` refreshes it.
+
+| Model | Grain | What it does |
+| --- | --- | --- |
+| `stg_riksbank_fx` | fixing day | rate + log return vs. the previous fixing |
+| `fct_trading_day_fx` | weekday | joins `dim_date`, the XSTO calendar and the fixing; `is_xsto_trading_day` is NULL in years the exchange seed does not cover |
+| `fct_fx_regimes` | regime | `cpt_pelt(returns, 'normal', var('cpt_penalty'), var('cpt_min_regime_days'))`, then `cpt_segment_stats`: start/end date, trading days, mean return, daily and annualised volatility |
+
+The `normal` cost detects changes in mean *and* variance. FX returns keep
+a mean near zero, so what it finds are volatility shifts: COVID in spring
+2020 (13.6 % annualised) and the April 2025 tariff shock (14.0 %),
+against 4–7 % in calm regimes. `cpt_penalty` (default `mbic`, R
+changepoint's convention; also `bic`, `aic` or a number) and
+`cpt_min_regime_days` (default 20) control how many breaks survive.
+
+The calendar is the index, and it is checked against the data:
+`tests/assert_fx_fixings_match_xsto_calendar.sql` asserts that, in years
+the exchange seed covers, the Riksbank publishes on exactly the XSTO
+trading days. That test caught New Year's Eve, which the seed listed as
+a half-day session; Nasdaq Stockholm is closed on 31 December. Two more
+tests check that the regimes tile the return series, and that the 2020
+and 2025 stress dates fall in regimes with at least twice the median
+volatility.
+
+**Running it.** `cpt` is not in a DuckDB extension repository yet, so
+build it and point `CPT_EXTENSION_PATH` at the binary. When that variable
+is set, `profiles.yml` enables `allow_unsigned_extensions`; otherwise
+signature checks stay on.
+
+```bash
+git clone --recursive https://github.com/hugr-lab/duck-changepoint
+(cd duck-changepoint && make configure && make release)
+export CPT_EXTENSION_PATH=$PWD/duck-changepoint/build/release/cpt.duckdb_extension
+
+dbt build --vars '{with_changepoint: true}' --select tag:changepoint
+uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
+```
+
+The models build into `Referensdata` like the rest of the project; only
+scalar columns cross to SQL Server, since the list work stays inside the
+DuckDB query. CI builds `cpt` at a pinned commit (`CPT_REF` in
+`.github/workflows/ci.yml`) and runs these models after the main build.
 
 ---
 
@@ -519,11 +576,22 @@ as plain `INT`, so consumers can read it without ever issuing a
 │   ├── staging/
 │   │   ├── stg_public_holidays.sql
 │   │   └── stg_date_spine.sql
-│   └── marts/
-│       ├── dim_date.sql
-│       ├── fct_holiday_calendar.sql
-│       └── fct_exchange_calendar.sql
+│   ├── marts/
+│   │   ├── dim_date.sql
+│   │   ├── fct_holiday_calendar.sql
+│   │   └── fct_exchange_calendar.sql
+│   └── changepoint/          # with_changepoint: SEK/EUR volatility regimes
+│       ├── schema.yml
+│       ├── stg_riksbank_fx.sql
+│       ├── fct_trading_day_fx.sql
+│       └── fct_fx_regimes.sql
+├── macros/
+│   └── load_cpt.sql          # pre-hook: LOAD the cpt extension
+├── scripts/
+│   ├── fetch_riksbank_fx.py  # refresh seeds/riksbank_sekeur.csv
+│   └── plot_fx_regimes.py    # docs/fx_regimes.png
 └── seeds/
     ├── dim_country.csv
-    └── exchange_holidays.csv
+    ├── exchange_holidays.csv
+    └── riksbank_sekeur.csv
 ```

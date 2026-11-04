@@ -42,6 +42,14 @@ holiday_loader:
         # Path to a CA bundle DuckDB's azure extension uses for TLS.
         # Override with AZURE_CA_CERT_FILE in .env (default suits debian/ubuntu).
         ca_cert_file: "{{ env_var('AZURE_CA_CERT_FILE', '/etc/ssl/certs/ca-certificates.crt') }}"
+      # The change point example LOADs the cpt extension from a local,
+      # unsigned build (CPT_EXTENSION_PATH). allow_unsigned_extensions is
+      # a startup option -- `SET` on a running database is rejected -- so
+      # it goes in config_options, which dbt-duckdb passes to
+      # duckdb.connect(). It is only switched on when CPT_EXTENSION_PATH
+      # is set, so a normal run keeps signature checks.
+      config_options:
+        allow_unsigned_extensions: "{{ env_var('CPT_EXTENSION_PATH', '') != '' }}"
       attach:
         - path: "Server=localhost,1433;Database=Referensdata;UID=sa;PWD={{ env_var('SA_PASSWORD') }};Encrypt=yes;TrustServerCertificate=yes"
           type: mssql

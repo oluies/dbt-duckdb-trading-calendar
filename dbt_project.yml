@@ -33,6 +33,18 @@ vars:
   # and ingest models. The .github/workflows/elementary.yml job flips
   # this to true and then publishes an HTML report via `edr report`.
   with_elementary: false
+  # Toggle for the change point example (models/changepoint/): SEK/EUR
+  # volatility regimes found by PELT over Nasdaq Stockholm trading days.
+  # Off by default because it needs the cpt DuckDB extension, which is
+  # not in a DuckDB extension repo yet: build it from
+  # https://github.com/hugr-lab/duck-changepoint and point
+  # CPT_EXTENSION_PATH at the .duckdb_extension file. See README
+  # "Change point example".
+  with_changepoint: false
+  # PELT penalty ('bic', 'mbic', 'aic' or a number) and the shortest
+  # regime, in trading days, that fct_fx_regimes may report.
+  cpt_penalty: 'mbic'
+  cpt_min_regime_days: 20
 
 models:
   holiday_loader:
@@ -46,6 +58,13 @@ models:
         +materialized: ephemeral
     marts:
       +materialized: table
+    changepoint:
+      +enabled: "{{ var('with_changepoint', false) }}"
+      +tags: ['changepoint']
+      fct_fx_regimes:
+        # cpt ships unsigned; profiles.yml allows unsigned extensions
+        # when CPT_EXTENSION_PATH is set.
+        +pre-hook: "{{ load_cpt() }}"
   # Elementary OSS package -- observability tables that ingest dbt
   # run/test artifacts. Disabled unless var('with_elementary') is true.
   #
@@ -101,6 +120,14 @@ seeds:
         iso_year_week: varchar(8)
         us_week_number: integer
         note: varchar(100)
+    # Riksbank daily SEK/EUR fixing, frozen so CI does not call the
+    # rate-limited API. Refresh with scripts/fetch_riksbank_fx.py.
+    riksbank_sekeur:
+      +enabled: "{{ var('with_changepoint', false) }}"
+      +tags: ['changepoint']
+      +column_types:
+        rate_date: date
+        sek_per_eur: decimal(10,4)
   elementary:
     +enabled: "{{ var('with_elementary', false) }}"
     +schema: elementary
