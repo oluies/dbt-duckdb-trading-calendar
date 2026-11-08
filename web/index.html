@@ -82,6 +82,19 @@
   .regimes button.regime { border: 1px solid transparent; background: transparent; padding: 2px 6px; margin-left: -7px; }
   .regimes button.regime[aria-pressed="true"] { border-color: var(--muted); font-weight: 600; }
   .wrap { overflow-x: auto; }
+  .wrap.many { max-height: 460px; overflow-y: auto; }
+
+  /* "Try other parameters" */
+  .live { margin-top: 20px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 6px; }
+  .live h2 { font-size: 15px; margin: 0 0 6px; }
+  .live p { margin: 0; }
+  .live-intro { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+  .live-intro p { flex: 1 1 24rem; min-width: 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; }
+  .controls label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .controls .value { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4.5em; }
+  .controls input[type="range"] { accent-color: var(--focus); width: 160px; max-width: 100%; }
+  .controls .result { flex-basis: 100%; font-variant-numeric: tabular-nums; }
 
   /* "How the regimes are found" */
   .explainer { margin-top: 40px; border-top: 1px solid var(--line); padding-top: 8px; }
@@ -105,6 +118,7 @@
 <body>
 <div id="app"></div>
 <script src="https://unpkg.com/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js"></script>
+<script src="duckdb-bridge.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

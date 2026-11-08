@@ -47,18 +47,22 @@ object App:
     val hovered = Var(Option.empty[String])
     val selected = Var(Option.empty[Int])
     val last = fx.days.last
+    // The regimes on screen: the published ones until the reader reruns the detection.
+    val active = Var(fx)
 
     div(
       div(
         cls := "toolbar",
         div(
           cls := "legend",
-          child <-- hovered.signal.map(t => legend(fx, t.flatMap(d => fx.days.find(_.date == d)).getOrElse(last)))
+          child <-- hovered.signal.combineWith(active.signal).map((t, shown) =>
+            legend(shown, t.flatMap(d => fx.days.find(_.date == d)).getOrElse(last))
+          )
         ),
         button(
           cls := "reset",
           typ := "button",
-          disabled <-- selected.signal.map(_.isEmpty),
+          // Not disabled when nothing is zoomed: that would drop keyboard focus to the top of the page.
           "Show all",
           onClick.mapTo(None) --> selected
         )
@@ -72,7 +76,8 @@ object App:
         onMountUnmountCallbackWithState(
           mount = ctx =>
             val chart = RegimeChart(ctx.thisNode.ref, fx, hovered.set)
-            selected.signal.foreach(n => chart.zoom(n.flatMap(i => fx.regimes.find(_.n == i))))(ctx.owner)
+            selected.signal.foreach(n => chart.zoom(n.flatMap(i => active.now().regimes.find(_.n == i))))(ctx.owner)
+            active.signal.changes.foreach(chart.show)(ctx.owner)
             Theme.palette.foreach(chart.applyPalette)(ctx.owner)
             chart
           ,
@@ -80,7 +85,18 @@ object App:
         ),
         onDblClick.mapTo(None) --> selected
       ),
-      div(cls := "wrap", regimeTable(fx, selected)),
+      Live.panel(
+        fx,
+        rerun =>
+          active.set(rerun)
+          // The numbering has changed, so the selection no longer means anything.
+          if selected.now().nonEmpty then selected.set(None)
+      ),
+      div(
+        cls := "wrap",
+        cls("many") <-- active.signal.map(_.regimes.size > 20),
+        child <-- active.signal.map(regimeTable(_, selected))
+      ),
       Explainer.view(fx)
     )
 

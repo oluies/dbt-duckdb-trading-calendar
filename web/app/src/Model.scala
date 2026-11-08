@@ -32,6 +32,20 @@ final case class FxData(days: Vector[Day], regimes: Vector[Regime]):
 
   def regimeOf(date: String): Option[Regime] = regimes.find(_.contains(date))
 
+  /** The regime of every day, in one walk over the two sorted lists. The first
+    * fixing has no return and so no regime; it takes the first regime's, which
+    * starts the band at the left edge of the chart.
+    */
+  lazy val regimeOfDay: Vector[Regime] =
+    var i = 0
+    days.map { d =>
+      while i < regimes.size - 1 && d.date > regimes(i).end do i += 1
+      regimes(i)
+    }
+
+  /** The fixing days that have a return, in the order the detector sees them. */
+  lazy val returnDays: Vector[Day] = days.filter(_.ret.isDefined)
+
   /** Index of a fixing day, for slicing the band of a regime. */
   def indexOf(date: String): Int = days.indexWhere(_.date == date)
 

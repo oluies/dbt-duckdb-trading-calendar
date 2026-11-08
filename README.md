@@ -562,9 +562,27 @@ The page has a **Background** picker (Auto, White, Light grey, Dark grey,
 Black). Auto follows the host's `data-theme`, then the OS setting; a choice
 is remembered in the browser. The regime table is keyboard operable (each
 regime is a button), **Show all** resets the zoom, and the chart carries a
-text alternative that points to the table. The build
-uses Scala 3.3 LTS, Scala.js 1.22 and Laminar 17.2, with Mill 1.3 through
-the `web/mill` launcher, so only a JDK is needed.
+text alternative that points to the table.
+
+The build uses Scala 3.3 LTS, Scala.js 1.22 and Laminar 17.2, with Mill 1.3
+through the `web/mill` launcher, so only a JDK is needed.
+
+**Try other parameters.** On the GitHub Pages site, the panel under the
+chart reruns the detection in the reader's browser. Choose a penalty (MBIC,
+BIC, AIC or a custom β) and a shortest regime length, and the chart and
+table update as the controls move. Nothing downloads until the reader
+presses **Load DuckDB** (about 7 MB).
+
+[`web/duckdb-bridge.js`](web/duckdb-bridge.js) starts
+[DuckDB-WASM](https://github.com/duckdb/duckdb-wasm) and loads
+`web/public/cpt.duckdb_extension.wasm`, the `wasm_eh` build from the
+duck-changepoint CI. The DuckDB-WASM version is pinned because the extension
+needs DuckDB 2.0 and npm's `latest` tag is still 1.5.4.
+[`Live.scala`](web/app/src/Live.scala) holds the panel. With the published
+settings, the browser reproduces all 8 regimes from the dbt build, with the
+same dates and lengths. The Claude artifact copy of the page cannot run the
+engine, because its content policy blocks it, so there the panel links to the
+Pages site.
 
 ### Tests
 
