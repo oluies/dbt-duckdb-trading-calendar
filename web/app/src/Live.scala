@@ -85,7 +85,12 @@ object Live:
             case State.Failed(message) =>
               div(
                 cls := "live-intro",
-                p(role := "alert", s"Could not start DuckDB in this browser: $message"),
+                p(
+                  role := "alert",
+                  s"Could not start DuckDB here: $message. Some hosts block it; the ",
+                  a(href := PagesUrl, "GitHub Pages version"),
+                  " of this page should work."
+                ),
                 button(typ := "button", "Try again", onClick --> (_ => load()))
               )
             case State.Ready(session) => controls(published, session, params, onResult)
