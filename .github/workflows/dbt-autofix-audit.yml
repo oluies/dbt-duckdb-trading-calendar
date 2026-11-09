@@ -62,7 +62,8 @@ jobs:
           set -uo pipefail
           mkdir -p "${GITHUB_WORKSPACE}/audit"
           log="${GITHUB_WORKSPACE}/audit/holiday_loader.log"
-          uvx dbt-autofix deprecations --dry-run 2>&1 \
+          # Python pinned: dbt-autofix's mashumaro dependency fails on 3.14+.
+          uvx --python 3.12 dbt-autofix deprecations --dry-run 2>&1 \
             | sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' \
             | grep -vE '^Warning: Path .* does not exist$' \
             | tee "$log"

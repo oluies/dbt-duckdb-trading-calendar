@@ -15,7 +15,6 @@ on:
   pull_request:
     paths:
       - .github/workflows/refresh-data.yml
-      - .github/actions/build-cpt/**
 
 permissions:
   contents: write
@@ -93,15 +92,8 @@ jobs:
         if: steps.gate.outputs.build == 'true'
         run: make db-up && make db-init
 
-      - name: Build cpt extension
-        if: steps.gate.outputs.build == 'true'
-        id: cpt
-        uses: ./.github/actions/build-cpt
-
       - name: dbt build with tests
         if: steps.gate.outputs.build == 'true'
-        env:
-          CPT_EXTENSION_PATH: ${{ steps.cpt.outputs.extension-path }}
         run: |
           dbt deps
           dbt build --vars '{with_changepoint: true}'

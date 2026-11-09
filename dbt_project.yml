@@ -34,11 +34,8 @@ vars:
   # this to true and then publishes an HTML report via `edr report`.
   with_elementary: false
   # Toggle for the change point example (models/changepoint/): SEK/EUR
-  # volatility regimes found by PELT over Nasdaq Stockholm trading days.
-  # Off by default because it needs the cpt DuckDB extension, which is
-  # not in a DuckDB extension repo yet: build it from
-  # https://github.com/hugr-lab/duck-changepoint and point
-  # CPT_EXTENSION_PATH at the .duckdb_extension file. See README
+  # volatility regimes found by PELT over Nasdaq Stockholm trading days,
+  # with the cpt extension from the DuckDB community repository. See README
   # "Change point example".
   with_changepoint: false
   # PELT penalty ('bic', 'mbic', 'aic' or a number) and the shortest
@@ -61,10 +58,6 @@ models:
     changepoint:
       +enabled: "{{ var('with_changepoint', false) }}"
       +tags: ['changepoint']
-      fct_fx_regimes:
-        # cpt ships unsigned; profiles.yml allows unsigned extensions
-        # when CPT_EXTENSION_PATH is set.
-        +pre-hook: "{{ load_cpt() }}"
   # Elementary OSS package -- observability tables that ingest dbt
   # run/test artifacts. Disabled unless var('with_elementary') is true.
   #

@@ -495,14 +495,10 @@ Lists and structs never leave DuckDB: the query computes everything,
 then only scalar columns are written to SQL Server, so the table
 materialises in `Referensdata` like the rest of the project.
 
-**4. Loading the extension** ([`macros/load_cpt.sql`](macros/load_cpt.sql), `profiles.yml`).
-`fct_fx_regimes` has a pre-hook, `{{ load_cpt() }}`, that runs
-`LOAD '<CPT_EXTENSION_PATH>'` and stops with a clear error if the
-variable is unset. The path is read inside a macro because dbt evaluates
-`env_var()` in `dbt_project.yml` at parse time, which would break every
-run without it. `cpt` ships unsigned and `allow_unsigned_extensions` can
-only be set when DuckDB starts, so `profiles.yml` passes it in
-`config_options`, switched on only when `CPT_EXTENSION_PATH` is set.
+**4. Loading the extension** (`profiles.yml`).
+`cpt` is a signed [community extension](https://duckdb.org/community_extensions/),
+so it is listed under `extensions:` in the `dev` target, next to `mssql`.
+dbt-duckdb runs `INSTALL cpt FROM community` and `LOAD cpt` when it connects.
 
 **5. Chart** ([`scripts/plot_fx_regimes.py`](scripts/plot_fx_regimes.py)).
 It reads `fct_trading_day_fx` and `fct_fx_regimes` back from SQL Server
@@ -606,22 +602,16 @@ merge into calm regimes.
 
 ### Running it
 
-`cpt` is not in a DuckDB extension repository yet, so
-build it and point `CPT_EXTENSION_PATH` at the binary. When that variable
-is set, `profiles.yml` enables `allow_unsigned_extensions`; otherwise
-signature checks stay on.
+`profiles.yml` installs `cpt` from the DuckDB community repository, so there
+is nothing to build.
 
 ```bash
-git clone --recursive https://github.com/hugr-lab/duck-changepoint
-(cd duck-changepoint && make configure && make release)
-export CPT_EXTENSION_PATH=$PWD/duck-changepoint/build/release/cpt.duckdb_extension
-
 dbt build --vars '{with_changepoint: true}' --select tag:changepoint
 uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
 uv run scripts/chart_fx_regimes_tv.py    # writes docs/fx_regimes.html
 ```
 
-CI builds `cpt` at a pinned commit (`.github/actions/build-cpt`) and runs these models after the main build.
+CI runs these models after the main build.
 
 ---
 
@@ -771,8 +761,6 @@ as plain `INT`, so consumers can read it without ever issuing a
 │       ├── stg_riksbank_fx.sql
 │       ├── fct_trading_day_fx.sql
 │       └── fct_fx_regimes.sql
-├── macros/
-│   └── load_cpt.sql          # pre-hook: LOAD the cpt extension
 ├── scripts/
 │   ├── fetch_riksbank_fx.py  # refresh seeds/riksbank_sekeur.csv
 │   ├── fx_regimes_db.py      # reads the regime tables for both charts

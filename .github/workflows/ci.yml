@@ -63,15 +63,7 @@ jobs:
       - name: dbt test
         run: dbt test
 
-      # Change point example (models/changepoint/). cpt is not in a DuckDB
-      # extension repo, so build it from source (.github/actions/build-cpt).
-      - name: Build cpt extension
-        id: cpt
-        uses: ./.github/actions/build-cpt
-
       - name: dbt build (change point example)
-        env:
-          CPT_EXTENSION_PATH: ${{ steps.cpt.outputs.extension-path }}
         run: |
           dbt build --vars '{with_changepoint: true}' --select tag:changepoint
 
