@@ -1,0 +1,147 @@
+name: Refresh FX data
+
+# Keeps the change point example current. Fetches new Riksbank SEK/EUR
+# fixings into the seed, rebuilds the models with all their tests, exports
+# the JSON the page loads, and commits the two data files to main. If a test
+# fails nothing is committed, and the failed run is the alert.
+#
+# A pull request touching this workflow runs it as a dry run: everything
+# except the commit and the deploy.
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Mondays 05:00 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/refresh-data.yml
+      - .github/actions/build-cpt/**
+
+permissions:
+  contents: write
+  actions: write # to start the Pages deploy
+
+concurrency:
+  group: refresh-fx-data
+  cancel-in-progress: false
+
+env:
+  # Only used for the throwaway SQL Server service started in this workflow.
+  SA_PASSWORD: CI_Str0ng_P@ssword_2026!
+  AZURE_CA_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+  DBT_PROFILES_DIR: ${{ github.workspace }}
+  SEED: seeds/riksbank_sekeur.csv
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Install dbt
+        run: pip install -r requirements.txt
+
+      - name: Fetch new fixings
+        id: fetch
+        run: |
+          python scripts/fetch_riksbank_fx.py
+          # The series only grows. A removed or changed row means a revision
+          # or a truncated response, which a person should look at.
+          deleted=$(git diff --numstat -- "$SEED" | cut -f2)
+          if [ -n "$deleted" ] && [ "$deleted" != 0 ]; then
+            echo "::error::$SEED lost or changed $deleted existing rows"
+            git diff -- "$SEED" | head -40
+            exit 1
+          fi
+          if git diff --quiet -- "$SEED"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --numstat -- "$SEED"
+          fi
+
+      # A dry run always exercises the whole pipeline; otherwise stop if the
+      # Riksbank has published nothing new.
+      - name: Decide whether to build
+        id: gate
+        run: |
+          if [ "${{ steps.fetch.outputs.changed }}" = true ] || [ "${{ github.event_name }}" = pull_request ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No new fixings."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write .env for docker compose + Make
+        if: steps.gate.outputs.build == 'true'
+        run: |
+          cat > .env <<ENV
+          SA_PASSWORD=${SA_PASSWORD}
+          AZURE_CA_CERT_FILE=${AZURE_CA_CERT_FILE}
+          ENV
+
+      - name: Start SQL Server
+        if: steps.gate.outputs.build == 'true'
+        run: make db-up && make db-init
+
+      - name: Build cpt extension
+        if: steps.gate.outputs.build == 'true'
+        id: cpt
+        uses: ./.github/actions/build-cpt
+
+      - name: dbt build with tests
+        if: steps.gate.outputs.build == 'true'
+        env:
+          CPT_EXTENSION_PATH: ${{ steps.cpt.outputs.extension-path }}
+        run: |
+          dbt deps
+          dbt build --vars '{with_changepoint: true}'
+
+      - name: Export the page's data
+        if: steps.gate.outputs.build == 'true'
+        run: uv run scripts/export_fx_regimes_json.py
+
+      - name: Check colour contrast against the new regimes
+        if: steps.gate.outputs.build == 'true'
+        run: python3 scripts/check_contrast.py
+
+      - name: Show what changed
+        if: steps.gate.outputs.build == 'true'
+        run: |
+          git diff --stat -- "$SEED" web/public/fx_regimes.json
+          python3 -c "
+          import json
+          d = json.load(open('web/public/fx_regimes.json'))
+          print(len(d['days']), 'fixings to', d['days'][-1][0], ';', len(d['regimes']), 'regimes')
+          for r in d['regimes']:
+              print(r['start'], r['end'], r['trading_days'], round(r['annualised_vol_pct'], 1))"
+
+      - name: Commit and deploy
+        if: steps.gate.outputs.build == 'true' && steps.fetch.outputs.changed == 'true' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$SEED" web/public/fx_regimes.json
+          git commit -m "chore: refresh Riksbank SEK/EUR data [skip ci]"
+          git push
+          # A push made with GITHUB_TOKEN does not trigger other workflows.
+          gh workflow run pages.yml --ref main
+
+      - name: Dump SQL Server logs on failure
+        if: failure() && steps.gate.outputs.build == 'true'
+        run: docker compose logs mssql --no-color --tail 200
+
+      - name: Tear down
+        if: always() && steps.gate.outputs.build == 'true'
+        run: make db-down || true
