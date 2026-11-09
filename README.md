@@ -408,7 +408,12 @@ it finds **volatility regimes in the SEK/EUR exchange rate** with the
 
 The input is the Riksbank's daily SEK/EUR fixing (SWEA series
 `SEKEURPMI`), frozen in `seeds/riksbank_sekeur.csv` so CI never calls the
-rate-limited API. `scripts/fetch_riksbank_fx.py` refreshes it.
+rate-limited API. `scripts/fetch_riksbank_fx.py` refreshes it, and
+[`.github/workflows/refresh-data.yml`](.github/workflows/refresh-data.yml)
+does so every Monday: it fetches new fixings, rebuilds the models with their
+tests, and commits the seed and the page's JSON only if everything passes.
+The figures quoted in this README and `docs/fx_regimes.png` are a snapshot
+from 30 October 2026.
 
 | Model | Grain | What it does |
 | --- | --- | --- |
@@ -616,8 +621,7 @@ uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
 uv run scripts/chart_fx_regimes_tv.py    # writes docs/fx_regimes.html
 ```
 
-CI builds `cpt` at a pinned commit (`CPT_REF` in
-`.github/workflows/ci.yml`) and runs these models after the main build.
+CI builds `cpt` at a pinned commit (`.github/actions/build-cpt`) and runs these models after the main build.
 
 ---
 
