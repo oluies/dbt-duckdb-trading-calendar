@@ -13,3 +13,6 @@ select date_day, is_xsto_trading_day, has_fixing
 from {{ ref('fct_trading_day_fx') }}
 where is_xsto_trading_day is not null
   and is_xsto_trading_day <> has_fixing
+  -- A gap in the Riksbank's series, not a closure: SEKEURPMI has no value for
+  -- this normal trading day, while SEKUSDPMI does.
+  and date_day <> date '2022-02-02'

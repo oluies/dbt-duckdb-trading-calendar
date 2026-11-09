@@ -307,7 +307,11 @@ erDiagram
   are inferred from "no row" plus `dim_date.is_weekend`.
 
 The seed is pre-populated with **Nasdaq Stockholm (XSTO)** exception
-days for 2024–2026 as a worked example.
+days for 2015–2026 as a worked example. The rows for 2015–2023 were
+generated with the
+[`exchange_calendars`](https://github.com/gerrymanoim/exchange_calendars)
+library (version 4.13.2), which agrees with the hand-checked closures for
+2024–2026.
 
 ### Using the cyclical encodings
 
@@ -507,27 +511,7 @@ seaborn. The top panel shows the rate with each regime shaded by
 volatility, and the bottom panel shows the returns with each regime's
 mean ± 2σ band.
 
-**6. Interactive chart** ([`scripts/chart_fx_regimes_tv.py`](scripts/chart_fx_regimes_tv.py)).
-The same data drawn with [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/)
-(Apache-2.0) into one self-contained page, [`docs/fx_regimes.html`](docs/fx_regimes.html).
-The data is embedded and the library loads from unpkg at a pinned version.
-The page has a crosshair legend (date, rate, return, regime), a marker at
-each regime start, and a regime table: click a row to zoom to that
-regime, double-click the chart to reset. GitHub does not render HTML in
-place, so download the file or open it from a clone.
-
-[![Interactive version](docs/fx_regimes_tv.png)](docs/fx_regimes.html)
-
-Lightweight Charts has no built-in background bands, so each regime is
-its own `AreaSeries` with value 1 on a hidden overlay price scale pinned
-to 0–1. A histogram would leave gaps between bars once ~3,000 days are
-squeezed into under one pixel each. Each band starts at the fixing
-*before* its first return, because a daily return covers the interval
-since the previous fixing; that way neighbouring bands meet. Both chart
-scripts read the tables through
-[`scripts/fx_regimes_db.py`](scripts/fx_regimes_db.py).
-
-**7. Scala.js + Laminar app** ([`web/`](web/)).
+**6. Scala.js + Laminar app** ([`web/`](web/)).
 The same chart as a [Scala.js](https://www.scala-js.org/) application
 with a [Laminar](https://laminar.dev) UI, over Lightweight Charts. It
 loads the regimes from `fx_regimes.json`, so it can be redeployed with
@@ -591,7 +575,9 @@ The calendar is the index, and it is checked against the data:
 [`tests/assert_fx_fixings_match_xsto_calendar.sql`](tests/assert_fx_fixings_match_xsto_calendar.sql) asserts that, in years
 the exchange seed covers, the Riksbank publishes on exactly the XSTO
 trading days. That test caught New Year's Eve, which the seed listed as
-a half-day session; Nasdaq Stockholm is closed on 31 December. Two more
+a half-day session; Nasdaq Stockholm is closed on 31 December. The check has one
+exception: the Riksbank published no SEK/EUR fixing on 2022-02-02, a normal
+trading day on which its SEK/USD fixing exists. Two more
 tests check that the regimes tile the return series
 ([`assert_fx_regimes_tile_series.sql`](tests/assert_fx_regimes_tile_series.sql)),
 and that the 2020 and 2025 stress dates fall in regimes with at least
@@ -608,7 +594,6 @@ is nothing to build.
 ```bash
 dbt build --vars '{with_changepoint: true}' --select tag:changepoint
 uv run scripts/plot_fx_regimes.py        # writes docs/fx_regimes.png
-uv run scripts/chart_fx_regimes_tv.py    # writes docs/fx_regimes.html
 ```
 
 CI runs these models after the main build.
@@ -765,7 +750,6 @@ as plain `INT`, so consumers can read it without ever issuing a
 │   ├── fetch_riksbank_fx.py  # refresh seeds/riksbank_sekeur.csv
 │   ├── fx_regimes_db.py      # reads the regime tables for both charts
 │   ├── plot_fx_regimes.py    # docs/fx_regimes.png (seaborn)
-│   ├── chart_fx_regimes_tv.py  # docs/fx_regimes.html (Lightweight Charts)
 │   └── export_fx_regimes_json.py  # web/public/fx_regimes.json
 ├── web/                      # Scala.js + Laminar version of the chart (Mill)
 └── seeds/
