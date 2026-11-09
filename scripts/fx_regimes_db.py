@@ -1,7 +1,7 @@
 """Read the change point example's tables back out of SQL Server.
 
-Shared by plot_fx_regimes.py (seaborn PNG) and chart_fx_regimes_tv.py
-(TradingView Lightweight Charts HTML). Goes through DuckDB's mssql
+Shared by plot_fx_regimes.py (seaborn PNG) and export_fx_regimes_json.py
+(the data for the Scala.js page). Goes through DuckDB's mssql
 extension, like scripts/db_init.py. Needs SA_PASSWORD in the environment.
 """
 from __future__ import annotations
