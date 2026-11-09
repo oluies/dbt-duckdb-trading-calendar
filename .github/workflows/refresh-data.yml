@@ -45,7 +45,7 @@ jobs:
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: Install dbt
         run: pip install -r requirements.txt
